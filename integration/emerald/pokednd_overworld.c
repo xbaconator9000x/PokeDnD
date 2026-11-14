@@ -225,11 +225,23 @@ static void EnemyPhase(void)
 {
     int target;
     if (d20_current(&sBattle) != sUnits.enemy) return;
-    target = sUnits.human;
+    /* A defeated human is not a valid target. Keep pursuing a living
+     * deployed ally rather than pathfinding towards an unconscious trainer. */
+    target = -1;
+    if (sBattle.units[sUnits.human].deployed &&
+        sBattle.units[sUnits.human].hp > 0)
+        target = sUnits.human;
     if (sBattle.units[sUnits.pokemon].deployed &&
         sBattle.units[sUnits.pokemon].hp > 0 &&
-        DistanceTo(sUnits.enemy,sUnits.pokemon) < DistanceTo(sUnits.enemy,target))
+        (target < 0 ||
+         DistanceTo(sUnits.enemy, sUnits.pokemon) < DistanceTo(sUnits.enemy, target)))
         target = sUnits.pokemon;
+    if (target < 0) {
+        /* The core normally resolves defeat on the finishing attack.
+         * Avoid invalid indexing if an external script changes the party. */
+        (void)d20_next(&sBattle);
+        return;
+    }
     if (DistanceTo(sUnits.enemy,target) > 1) {
         /* Breadth-first pursuit navigates around terrain rather than getting
          * trapped by a wall when no immediately closer tile is available.
