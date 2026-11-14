@@ -85,6 +85,31 @@ key z
 sleep 2; snap 17-end-pokemon-turn
 key BackSpace
 sleep 2; snap 18-cancel-attempt
+# Preserve the exact ROM identity and reproducible input sequence alongside frames.
+# A replay of a stale ROM cannot establish acceptance of the current source HEAD.
+sha256sum "$ROM" | awk '{print $1}' > "$OUT/rom-sha256.txt"
+cat > "$OUT/input-sequence.txt" <<'EOF'
+Emulator: mGBA SDL; key mapping: BackSpace=SELECT, a=L, s=R,
+Return=START, x=A, z=B, arrow keys=D-pad.
+Entry attempts: L+R+START at frames 06 and 13.
+Actions: A deployment, B turn advancement, SELECT cancellation.
+No gameplay acceptance is inferred from these inputs.
+EOF
+# A caller may supply an exact-head linked ELF to identify debugger probe
+# addresses. This does NOT claim those variables were read from the emulator.
+if [ -n "${POKEDND_ELF:-}" ]; then
+  test -f "$POKEDND_ELF" || { echo "Missing POKEDND_ELF" >&2; exit 1; }
+  NM="${POKEDND_NM:-arm-none-eabi-nm}"
+  "$NM" -n "$POKEDND_ELF" > "$OUT/linked-symbols.txt"
+  for symbol in gPokeDnDTriggerCount gPokeDnDStartFailure gPokeDnDDiagnosticState gPokeDnDMilestones; do
+    if ! awk -v s="$symbol" '$3 == s {found=1} END {exit !found}' "$OUT/linked-symbols.txt"; then
+      echo "Missing linked combat probe symbol: $symbol" >&2
+      exit 1
+    fi
+  done
+  awk '$3 ~ /^gPokeDnD(TriggerCount|StartFailure|DiagnosticState|Milestones)$/ {print}' \\
+    "$OUT/linked-symbols.txt" > "$OUT/probe-addresses.txt"
+fi
 # Diagnostic screenshots are not acceptance evidence. Record image changes
 # around the encounter attempt and refuse to label a static replay playable.
 # The native gPokeDnDDiagnosticState must be read by a debugger/mGBA probe
