@@ -38,6 +38,8 @@ static EWRAM_DATA u8 sMapNum;
 static EWRAM_DATA u8 sElevation;
 static EWRAM_DATA s16 sEntryX;
 static EWRAM_DATA s16 sEntryY;
+static EWRAM_DATA bool8 sFrozenByD20[OBJECT_EVENTS_COUNT];
+static EWRAM_DATA u8 sFrozenLocalId[OBJECT_EVENTS_COUNT];
 
 static int AbsCoord(int a) { return a < 0 ? -a : a; }
 static int DistanceTo(int a, int b)
@@ -60,8 +62,34 @@ static bool D20MapBlocked(int wx, int wy, void *ctx)
     }
     return false;
 }
+static void FreezeSurroundingActors(void)
+{
+    for (int i = 0; i < OBJECT_EVENTS_COUNT; i++) {
+        struct ObjectEvent *obj = &gObjectEvents[i];
+        sFrozenByD20[i] = FALSE;
+        if (!obj->active || i == gPlayerAvatar.objectEventId || obj->frozen)
+            continue;
+        /* FreezeObjectEvent returns FALSE only when it actually froze the NPC. */
+        if (!FreezeObjectEvent(obj)) {
+            sFrozenByD20[i] = TRUE;
+            sFrozenLocalId[i] = obj->localId;
+        }
+    }
+}
 static void CleanupCombat(bool8 restorePlayer)
 {
+    /* Never unfreeze a pre-existing scripted actor, or an NPC slot reused
+     * after a map warp. Only revert the freezes we personally installed. */
+    if (sActive && sMapGroup == gSaveBlock1Ptr->location.mapGroup &&
+        sMapNum == gSaveBlock1Ptr->location.mapNum) {
+        for (int i = 0; i < OBJECT_EVENTS_COUNT; i++) {
+            struct ObjectEvent *obj = &gObjectEvents[i];
+            if (sFrozenByD20[i] && obj->active && obj->frozen &&
+                obj->localId == sFrozenLocalId[i] && obj->mapGroup == sMapGroup &&
+                obj->mapNum == sMapNum)
+                UnfreezeObjectEvent(obj);
+        }
+    }
     /* Debug cancel is non-destructive. Never teleport across a map warp. */
     if (restorePlayer && sActive &&
         sMapGroup == gSaveBlock1Ptr->location.mapGroup &&
@@ -182,6 +210,7 @@ static bool StartCombat(void)
         return false;
     }
     sActive = TRUE;
+    FreezeSurroundingActors();
     return true;
 }
 static void EnemyPhase(void)
