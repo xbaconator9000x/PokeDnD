@@ -32,3 +32,7 @@ Run make test and make demo. CI builds GCC, Clang and sanitizer tests. These do 
 - Run in native mGBA and collect genuine LCD captures, logs and memory observations.
 - Test a cold restart and save checkpoint, then scale toward 3 human + 6 Pokémon under GBA memory/OAM pressure.
 - Never upload copyrighted ROM bytes, private user assets or saves to public CI.
+
+## Verified native GBA boot (POC-01 extension)
+
+On the development branch, original GBA Mode 3 rendering and button handlers were added as `gba/main.c`. The portable C99 rules core is cross-compiled with devkitARM into a small standalone homebrew ROM; no Emerald assets are included. Exact-head GitHub workflow run 43579199593 successfully built the ROM, launched it in the real mGBA SDL frontend, captured a 240×160 LCD PNG (12 colours), and uploaded ROM plus screenshot/log artifacts. This **verifies boot and rendered output only**, not correctness of key inputs, complete combat interactions, persistence, or Emerald overworld integration.
