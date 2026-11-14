@@ -30,6 +30,10 @@
 /* Exported native probe: 0=idle, 1=started, 2=deployed, 3=turn,
  * 4=cancelled, 5=completed. Never interpret screenshots as this state. */
 EWRAM_DATA volatile u32 gPokeDnDDiagnosticState;
+/* Sticky per-attempt milestones: bit 0=start, 1=deploy, 2=turn,
+ * 3=cancel, 4=finish. Unlike the last-state register, intermediate
+ * transitions remain inspectable after the replay has moved on. */
+EWRAM_DATA volatile u32 gPokeDnDMilestones;
 /* Nonzero rejection codes make a vanilla-only replay actionable:
  * 1 field controls locked, 2 projection/spawn, 3 world coordinate,
  * 4 Rocket ID collision, 5 Pikachu ID collision, 6 sprite allocation,
@@ -172,6 +176,7 @@ static bool SpawnPikachu(void)
         }
         sPikachuObjectId = spriteId;
         gPokeDnDDiagnosticState = 2;
+        gPokeDnDMilestones |= 2u;
         return true;
     }
     return false;
@@ -184,6 +189,7 @@ static bool StartCombat(void)
     if (sActive)
         return false;
     gPokeDnDDiagnosticState = 0;
+    gPokeDnDMilestones = 0;
     gPokeDnDStartFailure = 0;
     if (ArePlayerFieldControlsLocked()) {
         gPokeDnDStartFailure = 1;
@@ -248,6 +254,7 @@ static bool StartCombat(void)
     }
     sActive = TRUE;
     gPokeDnDDiagnosticState = 1;
+    gPokeDnDMilestones |= 1u;
     FreezeSurroundingActors();
     return true;
 }
@@ -382,12 +389,14 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
     if (newKeys & SELECT_BUTTON) {
         CleanupCombat(TRUE);
         gPokeDnDDiagnosticState = 4;
+        gPokeDnDMilestones |= 8u;
         return TRUE;
     }
     RunEnemyPhases();
     if (sBattle.outcome != FIGHTING) {
         CleanupCombat(FALSE);
         gPokeDnDDiagnosticState = 5;
+        gPokeDnDMilestones |= 16u;
         return TRUE;
     }
     id = d20_current(&sBattle);
@@ -404,11 +413,13 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
         if ((newKeys & B_BUTTON) && sBattle.outcome == FIGHTING) {
             if (d20_next(&sBattle))
                 gPokeDnDDiagnosticState = 3;
+                gPokeDnDMilestones |= 4u;
         }
     }
     if (sBattle.outcome != FIGHTING) {
         CleanupCombat(FALSE);
         gPokeDnDDiagnosticState = 5;
+        gPokeDnDMilestones |= 16u;
     }
     else
         RunEnemyPhases();
