@@ -2,7 +2,9 @@ name: POC-02 experimental Emerald field replay diagnostics
 on:
   pull_request:
     paths:
-      - "integration/emerald/ci_field_replay.sh"
+      - "integration/emerald/**"
+      - "src/d20*"
+      - "include/d20*"
       - ".github/workflows/emerald-field-replay.yml"
   workflow_dispatch:
 permissions:
@@ -14,21 +16,51 @@ concurrency:
 jobs:
   replay:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      - name: Download previously verified integrated Emerald ROM
-        uses: actions/download-artifact@v4
-        with:
-          repository: xbaconator9000x/PokeDnD
-          run-id: 43583355204
-          name: pokednd-poc02-emerald-integrated-private
-          path: rom
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install real mGBA display harness
+      - name: Install native compiler and real mGBA display harness
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \\
+            binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi \\
+            libpng-dev python3 build-essential mgba-sdl xvfb xdotool x11-apps imagemagick
+      - name: Fetch exact pinned Emerald source
+        run: |
+          git init upstream
+          git -C upstream remote add origin https://github.com/rh-hideout/pokeemerald-expansion.git
+          git -C upstream fetch --no-tags --depth=1 origin 4da9230cf7c1f1d7b0d47b45783b202666fffece
+          git -C upstream checkout --detach FETCH_HEAD
+          test "$(git -C upstream rev-parse HEAD)" = 4da9230cf7c1f1d7b0d47b45783b202666fffece
+      - name: Apply and compile this commit's native integration
+        env:
+          GAME_VERSION: EMERALD
+          COMPARE: 0
+          UNUSED_ERROR: 1
+        run: |
+          python3 integration/emerald/apply.py upstream
+          make -C upstream -j4 all
+          test -s upstream/pokeemerald.elf
+          arm-none-eabi-nm upstream/pokeemerald.elf | grep ' PokeDnD_HandleOverworldInput
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq mgba-sdl xvfb xdotool x11-apps imagemagick
+      - name: Capture startup, title, quickstart and overworld input attempts
+        run: |
+          ROM=$(find upstream -maxdepth 1 -type f -name '*.gba' | head -n 1)
+          test -s "$ROM"
+          chmod +x integration/emerald/ci_field_replay.sh
+          timeout 190s xvfb-run -a -s "-screen 0 800x600x24" \
+            integration/emerald/ci_field_replay.sh "$ROM" evidence
+      - name: Retain LCD frames and emulator diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pokednd-emerald-field-replay-diagnostic
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Capture startup, title, quickstart and overworld input attempts
         run: |
           ROM=$(find rom -type f -name '*.gba' | head -n 1)
