@@ -49,4 +49,14 @@ key x
 sleep 2; snap 07-after-a-deployment
 key z
 sleep 2; snap 08-after-b-turn
+# The previous test often reached a transitional mostly-black frame.
+# Continue recording instead of misreporting it as either success or failure.
+sleep 15; snap 09-transition-plus-15
+sleep 15; snap 10-transition-plus-30
+for i in $(seq 1 16); do
+  key x
+  sleep 1
+  if [ $((i % 4)) -eq 0 ]; then snap "11-dialogue-advance-$i"; fi
+done
+sleep 5; snap 12-final-field-candidate
 echo "Diagnostic captures complete; visual interpretation needed for gameplay claim."
