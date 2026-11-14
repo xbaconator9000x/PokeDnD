@@ -9,7 +9,6 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-  actions: read
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -19,11 +18,11 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      - name: Install native compiler and real mGBA display harness
+      - name: Install native compiler and mGBA display harness
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \\
-            binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi \\
+          sudo apt-get install -y --no-install-recommends \
+            binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi \
             libpng-dev python3 build-essential mgba-sdl xvfb xdotool x11-apps imagemagick
       - name: Fetch exact pinned Emerald source
         run: |
@@ -32,7 +31,7 @@ jobs:
           git -C upstream fetch --no-tags --depth=1 origin 4da9230cf7c1f1d7b0d47b45783b202666fffece
           git -C upstream checkout --detach FETCH_HEAD
           test "$(git -C upstream rev-parse HEAD)" = 4da9230cf7c1f1d7b0d47b45783b202666fffece
-      - name: Apply and compile this commit's native integration
+      - name: Apply and compile exact-head native integration
         env:
           GAME_VERSION: EMERALD
           COMPARE: 0
@@ -41,34 +40,14 @@ jobs:
           python3 integration/emerald/apply.py upstream
           make -C upstream -j4 all
           test -s upstream/pokeemerald.elf
-          arm-none-eabi-nm upstream/pokeemerald.elf | grep ' PokeDnD_HandleOverworldInput
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq mgba-sdl xvfb xdotool x11-apps imagemagick
-      - name: Capture startup, title, quickstart and overworld input attempts
+          arm-none-eabi-nm upstream/pokeemerald.elf | grep ' PokeDnD_HandleOverworldInput$'
+      - name: Replay real mGBA input and capture frames
         run: |
           ROM=$(find upstream -maxdepth 1 -type f -name '*.gba' | head -n 1)
           test -s "$ROM"
-          chmod +x integration/emerald/ci_field_replay.sh
           timeout 190s xvfb-run -a -s "-screen 0 800x600x24" \
-            integration/emerald/ci_field_replay.sh "$ROM" evidence
-      - name: Retain LCD frames and emulator diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pokednd-emerald-field-replay-diagnostic
-          path: evidence/
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Capture startup, title, quickstart and overworld input attempts
-        run: |
-          ROM=$(find rom -type f -name '*.gba' | head -n 1)
-          test -s "$ROM"
-          chmod +x integration/emerald/ci_field_replay.sh
-          timeout 190s xvfb-run -a -s "-screen 0 800x600x24" \
-            integration/emerald/ci_field_replay.sh "$ROM" evidence
-      - name: Retain LCD frames and emulator diagnostics
+            bash integration/emerald/ci_field_replay.sh "$ROM" evidence
+      - name: Retain emulator evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
