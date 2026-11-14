@@ -22,3 +22,40 @@ jobs:
           name: pokednd-poc-gba-unsigned-homebrew
           path: gba/build/pokednd-poc.gba
           if-no-files-found: error
+
+  emulator-boot:
+    needs: build-gba
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pokednd-poc-gba-unsigned-homebrew
+          path: rom
+      - name: Install native mGBA and capture utilities
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mgba-sdl xvfb xdotool x11-apps imagemagick
+      - name: Boot ROM in genuine mGBA and capture LCD window
+        run: |
+          mkdir -p evidence
+          xvfb-run -a -s "-screen 0 800x600x24" bash -euo pipefail -c '
+            export SDL_VIDEODRIVER=x11
+            mgba rom/pokednd-poc.gba >evidence/mgba.log 2>&1 &
+            EMU=$!
+            sleep 6
+            if ! kill -0 "$EMU"; then cat evidence/mgba.log; exit 1; fi
+            WINDOW=$(xdotool search --onlyvisible --name "mGBA" | head -n 1)
+            if [ -z "$WINDOW" ]; then echo "No mGBA display window"; exit 1; fi
+            xwd -silent -id "$WINDOW" | convert xwd:- evidence/mgba-lcd.png
+            kill "$EMU" || true
+            wait "$EMU" || true
+          '
+          test -s evidence/mgba-lcd.png
+          COLORS=$(identify -format %k evidence/mgba-lcd.png)
+          echo "mGBA visible frame colors: $COLORS"
+          test "$COLORS" -gt 6
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pokednd-mgba-boot-evidence
+          path: evidence/
+          if-no-files-found: error
