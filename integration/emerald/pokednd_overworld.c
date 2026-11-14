@@ -231,15 +231,40 @@ static void EnemyPhase(void)
         DistanceTo(sUnits.enemy,sUnits.pokemon) < DistanceTo(sUnits.enemy,target))
         target = sUnits.pokemon;
     if (DistanceTo(sUnits.enemy,target) > 1) {
-        /* Single cautious orthogonal step, obeying the actual tactical grid. */
+        /* Try every orthogonal neighbour. A blocked preferred axis must not
+         * leave the opponent stationary when another legal step exists. */
+        static const int stepX[4] = { 0, 1, 0, -1 };
+        static const int stepY[4] = { -1, 0, 1, 0 };
         D20Unit *enemy = &sBattle.units[sUnits.enemy];
         D20Unit *victim = &sBattle.units[target];
-        int dx = victim->x > enemy->x ? 1 : -1;
-        int dy = victim->y > enemy->y ? 1 : -1;
-        int x = enemy->x, y = enemy->y;
-        if (x != victim->x && d20_walk(&sBattle,sUnits.enemy,x+dx,y))
-            MoveVisual(sUnits.enemy);
-        else if (y != victim->y && d20_walk(&sBattle,sUnits.enemy,x,y+dy))
+        int best = -1;
+        int bestDistance = AbsCoord(enemy->x - victim->x)
+                         + AbsCoord(enemy->y - victim->y);
+        for (int i = 0; i < 4; i++) {
+            int x = enemy->x + stepX[i];
+            int y = enemy->y + stepY[i];
+            int distance = AbsCoord(x - victim->x) + AbsCoord(y - victim->y);
+            if (x < 0 || x >= D20_W || y < 0 || y >= D20_H ||
+                sBattle.map[y][x] == '#' || distance >= bestDistance)
+                continue;
+            /* Avoid walking into an occupied cell. d20_walk remains the
+             * authoritative validator for movement points and legality. */
+            bool occupied = false;
+            for (int j = 0; j < sBattle.count; j++) {
+                D20Unit *other = &sBattle.units[j];
+                if (j != sUnits.enemy && other->deployed && other->hp > 0 &&
+                    other->x == x && other->y == y) {
+                    occupied = true;
+                    break;
+                }
+            }
+            if (!occupied) {
+                best = i;
+                bestDistance = distance;
+            }
+        }
+        if (best >= 0 && d20_walk(&sBattle, sUnits.enemy,
+                                  enemy->x + stepX[best], enemy->y + stepY[best]))
             MoveVisual(sUnits.enemy);
     }
     if (DistanceTo(sUnits.enemy,target) == 1)
