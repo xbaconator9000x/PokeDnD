@@ -2,7 +2,9 @@ name: POC-02 genuine Emerald overworld source integration
 on:
   push:
     paths:
-      - "integration/emerald/**"
+      - "integration/emerald/pokednd_overworld.c"
+      - "integration/emerald/pokednd_overworld.h"
+      - "integration/emerald/apply.py"
       - "include/d20*"
       - "src/d20*"
       - ".github/workflows/emerald-integration.yml"
@@ -10,7 +12,9 @@ on:
       - main
   pull_request:
     paths:
-      - "integration/emerald/**"
+      - "integration/emerald/pokednd_overworld.c"
+      - "integration/emerald/pokednd_overworld.h"
+      - "integration/emerald/apply.py"
       - "include/d20*"
       - "src/d20*"
       - ".github/workflows/emerald-integration.yml"
