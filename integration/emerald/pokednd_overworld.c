@@ -206,7 +206,15 @@ static bool StartCombat(void)
     sBattle.units[sUnits.enemy].hp = 16;
     sBattle.units[sUnits.enemy].max_hp = 16;
     if (!d20_start(&sBattle)) {
-        CleanupCombat(FALSE);
+        /* The encounter is not active yet: CleanupCombat cannot own this
+         * sprite. Roll back the freshly allocated Rocket explicitly. */
+        if (sRocketObjectId < OBJECT_EVENTS_COUNT &&
+            gObjectEvents[sRocketObjectId].active &&
+            gObjectEvents[sRocketObjectId].localId == D20_ROCKET_LOCAL_ID &&
+            gObjectEvents[sRocketObjectId].mapGroup == sMapGroup &&
+            gObjectEvents[sRocketObjectId].mapNum == sMapNum)
+            RemoveObjectEvent(&gObjectEvents[sRocketObjectId]);
+        sRocketObjectId = OBJECT_EVENTS_COUNT;
         return false;
     }
     sActive = TRUE;
