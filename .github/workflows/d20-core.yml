@@ -1,9 +1,12 @@
 name: PokeDnD D20 core
 on:
   push:
-    branches: [main, "development/**"]
+    branches: [main]
   pull_request:
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   portable-c99:
     runs-on: ubuntu-latest
