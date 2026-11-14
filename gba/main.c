@@ -188,14 +188,20 @@ int main(void)
     uint16_t previous=0;
     REG_DISPCNT=MODE3_BG2;
     reset();
+    draw(); /* Redraw only when the map or combat state changes. */
     for(;;) {
-        uint16_t keys;
+        uint16_t keys, pressed;
         while(REG_VCOUNT>=160) { }
         while(REG_VCOUNT<160) { }
         keys=(uint16_t)(~REG_KEYINPUT)&0x03ff;
-        if(d20_current(&battle)==grunt) input(0);
-        else if(keys&~previous) input(keys&~previous);
+        pressed=(uint16_t)(keys&~previous);
+        if(d20_current(&battle)==grunt) {
+            input(0);
+            draw();
+        } else if(pressed) {
+            input(pressed);
+            draw();
+        }
         previous=keys;
-        draw();
     }
 }
