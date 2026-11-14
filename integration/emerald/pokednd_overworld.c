@@ -30,6 +30,11 @@
 /* Exported native probe: 0=idle, 1=started, 2=deployed, 3=turn,
  * 4=cancelled, 5=completed. Never interpret screenshots as this state. */
 EWRAM_DATA volatile u32 gPokeDnDDiagnosticState;
+/* Nonzero rejection codes make a vanilla-only replay actionable:
+ * 1 field controls locked, 2 projection/spawn, 3 world coordinate,
+ * 4 Rocket ID collision, 5 Pikachu ID collision, 6 sprite allocation,
+ * 7 initiative start. A successful activation clears this value. */
+EWRAM_DATA volatile u32 gPokeDnDStartFailure;
 static EWRAM_DATA D20Battle sBattle;
 static EWRAM_DATA D20FieldProjection sProjection;
 static EWRAM_DATA D20FieldEncounter sUnits;
@@ -173,26 +178,40 @@ static bool StartCombat(void)
     struct MapPosition player;
     int wx, wy;
     /* Avoid scripts, link rooms, active movement and accidental re-entry. */
-    if (sActive || ArePlayerFieldControlsLocked())
+    if (sActive)
         return false;
+    gPokeDnDDiagnosticState = 0;
+    gPokeDnDStartFailure = 0;
+    if (ArePlayerFieldControlsLocked()) {
+        gPokeDnDStartFailure = 1;
+        return false;
+    }
     GetPlayerPosition(&player);
     d20_init(&sBattle, 0x12345678u ^ (u32)(player.x * 7919 + player.y * 104729));
     if (!d20_field_project(&sBattle,&sProjection,player.x,player.y,
                            D20MapBlocked,NULL) ||
-        !d20_field_spawn_demo(&sBattle,&sProjection,&sUnits))
+        !d20_field_spawn_demo(&sBattle,&sProjection,&sUnits)) {
+        gPokeDnDStartFailure = 2;
         return false;
+    }
     if (!d20_field_to_world(&sProjection,sBattle.units[sUnits.enemy].x,
-                           sBattle.units[sUnits.enemy].y,&wx,&wy))
+                           sBattle.units[sUnits.enemy].y,&wx,&wy)) {
+        gPokeDnDStartFailure = 3;
         return false;
+    }
     /* Fail closed if the world has a conflicting reserved local ID. */
     if (!TryGetObjectEventIdByLocalIdAndMap(D20_ROCKET_LOCAL_ID,
             gSaveBlock1Ptr->location.mapNum,
-            gSaveBlock1Ptr->location.mapGroup, &sRocketObjectId))
+            gSaveBlock1Ptr->location.mapGroup, &sRocketObjectId)) {
+        gPokeDnDStartFailure = 4;
         return false;
+    }
     if (!TryGetObjectEventIdByLocalIdAndMap(D20_PIKACHU_LOCAL_ID,
             gSaveBlock1Ptr->location.mapNum,
-            gSaveBlock1Ptr->location.mapGroup, &sPikachuObjectId))
+            gSaveBlock1Ptr->location.mapGroup, &sPikachuObjectId)) {
+        gPokeDnDStartFailure = 5;
         return false;
+    }
     sMapGroup = gSaveBlock1Ptr->location.mapGroup;
     sMapNum = gSaveBlock1Ptr->location.mapNum;
     sElevation = player.elevation;
@@ -202,8 +221,10 @@ static bool StartCombat(void)
         OBJ_EVENT_GFX_ROCKET_M, MOVEMENT_TYPE_NONE,
         D20_ROCKET_LOCAL_ID, wx, wy, sElevation);
     sPikachuObjectId = OBJECT_EVENTS_COUNT;
-    if (sRocketObjectId == OBJECT_EVENTS_COUNT)
+    if (sRocketObjectId == OBJECT_EVENTS_COUNT) {
+        gPokeDnDStartFailure = 6;
         return false;
+    }
     sBattle.units[sUnits.human].stats[DEX] = 14;
     sBattle.units[sUnits.pokemon].stats[DEX] = 16;
     sBattle.units[sUnits.pokemon].stats[CHA] = 18;
@@ -219,6 +240,7 @@ static bool StartCombat(void)
             gObjectEvents[sRocketObjectId].mapNum == sMapNum)
             RemoveObjectEvent(&gObjectEvents[sRocketObjectId]);
         sRocketObjectId = OBJECT_EVENTS_COUNT;
+        gPokeDnDStartFailure = 7;
         return false;
     }
     sActive = TRUE;
