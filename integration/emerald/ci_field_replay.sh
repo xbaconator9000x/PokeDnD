@@ -31,7 +31,10 @@ sleep 10; snap 01-startup
 sleep 12; snap 02-title-animation
 # Emerald title animation is still in progress after ~22 seconds.
 # Pressing SELECT before Task_TitleScreenPhase3 is active is ignored.
-sleep 14; snap 02b-interactive-title
+sleep 14; snap 02b-title-cinematic
+# The rider cinematic still runs at ~36 s; the press-start title appears
+# only after roughly 45 s. Wait until the SELECT New Game HUD is shown.
+sleep 16; snap 02c-title-ready
 # pokeemerald-expansion quickstart: SELECT on interactive title skips naming.
 key BackSpace
 sleep 8; snap 03-after-title-select
