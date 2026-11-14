@@ -49,7 +49,7 @@ jobs:
             WINDOW=$(xdotool search --onlyvisible --name "mGBA" | head -n 1)
             if [ -z "$WINDOW" ]; then echo "No mGBA display window"; exit 1; fi
             timeout 5s xwd -silent -id "$WINDOW" | convert xwd:- evidence/mgba-lcd.png
-            xdotool windowfocus "$WINDOW"
+            xdotool windowfocus "$WINDOW" || true
             xdotool keydown --window "$WINDOW" x
             sleep 1
             xdotool keyup --window "$WINDOW" x
