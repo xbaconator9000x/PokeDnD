@@ -1,0 +1,254 @@
+/*
+ * PokeDnD tactical overworld hook for pinned pokeemerald-expansion.
+ * Original homebrew integration code. No ROM bytes or new art assets.
+ *
+ * L+R+START on the field triggers a one-human/one-Pikachu/one-Rocket encounter.
+ * During combat: D-pad moves the currently active ally; A sends out Pikachu
+ * as the human's Action or Pikachu uses Thunderbolt; L performs a human Tackle;
+ * R performs Pikachu Quick Attack; B ends a friendly turn;
+ * SELECT cancels the encounter without modifying the map or save.
+ *
+ * This is a debug encounter, not a replacement for normal Pokemon battles.
+ */
+#include "global.h"
+#include "d20.h"
+#include "d20_field.h"
+#include "event_object_movement.h"
+#include "field_control_avatar.h"
+#include "field_player_avatar.h"
+#include "fieldmap.h"
+#include "main.h"
+#include "script.h"
+#include "constants/event_objects.h"
+#include "constants/event_object_movement.h"
+
+/* These local IDs are reserved only while this debug fight is active. */
+#define D20_ROCKET_LOCAL_ID 231
+#define D20_PIKACHU_LOCAL_ID 232
+#define D20_DEBUG_CHORD (L_BUTTON | R_BUTTON | START_BUTTON)
+
+static EWRAM_DATA D20Battle sBattle;
+static EWRAM_DATA D20FieldProjection sProjection;
+static EWRAM_DATA D20FieldEncounter sUnits;
+static EWRAM_DATA u8 sRocketObjectId;
+static EWRAM_DATA u8 sPikachuObjectId;
+static EWRAM_DATA u8 sActive;
+static EWRAM_DATA u8 sMapGroup;
+static EWRAM_DATA u8 sMapNum;
+static EWRAM_DATA u8 sElevation;
+
+static int AbsCoord(int a) { return a < 0 ? -a : a; }
+static int DistanceTo(int a, int b)
+{
+    D20Unit *u = &sBattle.units[a];
+    D20Unit *v = &sBattle.units[b];
+    return AbsCoord(u->x - v->x) + AbsCoord(u->y - v->y);
+}
+static bool D20MapBlocked(int wx, int wy, void *ctx)
+{
+    (void)ctx;
+    if (!AreCoordsInsidePlayerMap(wx, wy) || MapGridGetCollisionAt(wx, wy))
+        return true;
+    /* Honour existing world actors, not only metatile passability. */
+    for (int i = 0; i < OBJECT_EVENTS_COUNT; i++) {
+        const struct ObjectEvent *obj = &gObjectEvents[i];
+        if (obj->active && !obj->isPlayer &&
+            obj->currentCoords.x == wx && obj->currentCoords.y == wy)
+            return true;
+    }
+    return false;
+}
+static void CleanupCombat(void)
+{
+    if (sRocketObjectId < OBJECT_EVENTS_COUNT &&
+        gObjectEvents[sRocketObjectId].active)
+        RemoveObjectEvent(&gObjectEvents[sRocketObjectId]);
+    if (sPikachuObjectId < OBJECT_EVENTS_COUNT &&
+        gObjectEvents[sPikachuObjectId].active)
+        RemoveObjectEvent(&gObjectEvents[sPikachuObjectId]);
+    sActive = FALSE;
+    sRocketObjectId = OBJECT_EVENTS_COUNT;
+    sPikachuObjectId = OBJECT_EVENTS_COUNT;
+}
+static void MoveVisual(int id)
+{
+    int wx, wy;
+    D20Unit *unit;
+    if (id < 0 || id >= sBattle.count) return;
+    unit = &sBattle.units[id];
+    if (!d20_field_to_world(&sProjection, unit->x, unit->y, &wx, &wy))
+        return;
+    if (id == sUnits.human) {
+        MoveObjectEventToMapCoords(&gObjectEvents[gPlayerAvatar.objectEventId],wx,wy);
+    } else if (id == sUnits.pokemon && sPikachuObjectId < OBJECT_EVENTS_COUNT &&
+               gObjectEvents[sPikachuObjectId].active) {
+        MoveObjectEventToMapCoords(&gObjectEvents[sPikachuObjectId],wx,wy);
+    } else if (id == sUnits.enemy && sRocketObjectId < OBJECT_EVENTS_COUNT &&
+               gObjectEvents[sRocketObjectId].active) {
+        MoveObjectEventToMapCoords(&gObjectEvents[sRocketObjectId],wx,wy);
+    }
+}
+static bool SpawnPikachu(void)
+{
+    int id = sUnits.pokemon, wx, wy;
+    D20Unit *human = &sBattle.units[sUnits.human];
+    const int dirX[] = {1,0,-1,0};
+    const int dirY[] = {0,1,0,-1};
+    for (int i = 0; i < 4; i++) {
+        int x = human->x + dirX[i], y = human->y + dirY[i];
+        if (x < 0 || x >= D20_W || y < 0 || y >= D20_H ||
+            sBattle.map[y][x] == '#')
+            continue;
+        if (!d20_field_to_world(&sProjection,x,y,&wx,&wy))
+            continue;
+        /* Deployment costs the human's actual Action. */
+        if (!d20_deploy(&sBattle, sUnits.human, id, x, y))
+            continue;
+        sPikachuObjectId = SpawnSpecialObjectEventParameterized(
+            OBJ_EVENT_GFX_PIKACHU, MOVEMENT_TYPE_NONE,
+            D20_PIKACHU_LOCAL_ID, wx, wy, sElevation);
+        if (sPikachuObjectId == OBJECT_EVENTS_COUNT) {
+            /* Abort rather than leave an invisible active combatant. */
+            CleanupCombat();
+            return false;
+        }
+        return true;
+    }
+    return false;
+}
+static bool StartCombat(void)
+{
+    struct MapPosition player;
+    int wx, wy;
+    /* Avoid scripts, link rooms, active movement and accidental re-entry. */
+    if (sActive || ArePlayerFieldControlsLocked())
+        return false;
+    GetPlayerPosition(&player);
+    d20_init(&sBattle, 0x12345678u ^ (u32)(player.x * 7919 + player.y * 104729));
+    if (!d20_field_project(&sBattle,&sProjection,player.x,player.y,
+                           D20MapBlocked,NULL) ||
+        !d20_field_spawn_demo(&sBattle,&sProjection,&sUnits))
+        return false;
+    if (!d20_field_to_world(&sProjection,sBattle.units[sUnits.enemy].x,
+                           sBattle.units[sUnits.enemy].y,&wx,&wy))
+        return false;
+    /* Fail closed if the world has a conflicting reserved local ID. */
+    if (!TryGetObjectEventIdByLocalIdAndMap(D20_ROCKET_LOCAL_ID,
+            gSaveBlock1Ptr->location.mapNum,
+            gSaveBlock1Ptr->location.mapGroup, &sRocketObjectId))
+        return false;
+    if (!TryGetObjectEventIdByLocalIdAndMap(D20_PIKACHU_LOCAL_ID,
+            gSaveBlock1Ptr->location.mapNum,
+            gSaveBlock1Ptr->location.mapGroup, &sPikachuObjectId))
+        return false;
+    sMapGroup = gSaveBlock1Ptr->location.mapGroup;
+    sMapNum = gSaveBlock1Ptr->location.mapNum;
+    sElevation = player.elevation;
+    sRocketObjectId = SpawnSpecialObjectEventParameterized(
+        OBJ_EVENT_GFX_ROCKET_M, MOVEMENT_TYPE_NONE,
+        D20_ROCKET_LOCAL_ID, wx, wy, sElevation);
+    sPikachuObjectId = OBJECT_EVENTS_COUNT;
+    if (sRocketObjectId == OBJECT_EVENTS_COUNT)
+        return false;
+    sBattle.units[sUnits.human].stats[DEX] = 14;
+    sBattle.units[sUnits.pokemon].stats[DEX] = 16;
+    sBattle.units[sUnits.pokemon].stats[CHA] = 18;
+    sBattle.units[sUnits.enemy].hp = 16;
+    sBattle.units[sUnits.enemy].max_hp = 16;
+    if (!d20_start(&sBattle)) {
+        CleanupCombat();
+        return false;
+    }
+    sActive = TRUE;
+    return true;
+}
+static void EnemyPhase(void)
+{
+    int target;
+    if (d20_current(&sBattle) != sUnits.enemy) return;
+    target = sUnits.human;
+    if (sBattle.units[sUnits.pokemon].deployed &&
+        sBattle.units[sUnits.pokemon].hp > 0 &&
+        DistanceTo(sUnits.enemy,sUnits.pokemon) < DistanceTo(sUnits.enemy,target))
+        target = sUnits.pokemon;
+    if (DistanceTo(sUnits.enemy,target) > 1) {
+        /* Single cautious orthogonal step, obeying the actual tactical grid. */
+        D20Unit *enemy = &sBattle.units[sUnits.enemy];
+        D20Unit *victim = &sBattle.units[target];
+        int dx = victim->x > enemy->x ? 1 : -1;
+        int dy = victim->y > enemy->y ? 1 : -1;
+        int x = enemy->x, y = enemy->y;
+        if (x != victim->x && d20_walk(&sBattle,sUnits.enemy,x+dx,y))
+            MoveVisual(sUnits.enemy);
+        else if (y != victim->y && d20_walk(&sBattle,sUnits.enemy,x,y+dy))
+            MoveVisual(sUnits.enemy);
+    }
+    if (DistanceTo(sUnits.enemy,target) == 1)
+        (void)d20_attack(&sBattle,sUnits.enemy,target,TACKLE);
+    if (sBattle.outcome == FIGHTING)
+        (void)d20_next(&sBattle);
+}
+static void RunEnemyPhases(void)
+{
+    for (int i = 0; i < 6 && sBattle.outcome == FIGHTING &&
+                        d20_current(&sBattle) == sUnits.enemy; i++)
+        EnemyPhase();
+}
+static void MoveSelected(u16 newKeys)
+{
+    int id = d20_current(&sBattle), x, y;
+    D20Unit *unit;
+    if (id < 0 || id == sUnits.enemy) return;
+    unit = &sBattle.units[id];
+    x = unit->x; y = unit->y;
+    if (newKeys & DPAD_UP) y--;
+    else if (newKeys & DPAD_DOWN) y++;
+    else if (newKeys & DPAD_LEFT) x--;
+    else if (newKeys & DPAD_RIGHT) x++;
+    else return;
+    if (d20_walk(&sBattle,id,x,y))
+        MoveVisual(id);
+}
+bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
+{
+    int id;
+    if (!sActive) {
+        if ((newKeys & START_BUTTON) && (heldKeys & D20_DEBUG_CHORD) == D20_DEBUG_CHORD)
+            return StartCombat();
+        return FALSE;
+    }
+    /* Always yield to Emerald if the map changed unexpectedly. */
+    if (sMapGroup != gSaveBlock1Ptr->location.mapGroup ||
+        sMapNum != gSaveBlock1Ptr->location.mapNum) {
+        CleanupCombat();
+        return FALSE;
+    }
+    if (newKeys & SELECT_BUTTON) {
+        CleanupCombat();
+        return TRUE;
+    }
+    RunEnemyPhases();
+    if (sBattle.outcome != FIGHTING) {
+        CleanupCombat();
+        return TRUE;
+    }
+    id = d20_current(&sBattle);
+    if (id == sUnits.human || id == sUnits.pokemon) {
+        MoveSelected(newKeys);
+        if (newKeys & A_BUTTON) {
+            if (id == sUnits.human) (void)SpawnPikachu();
+            else (void)d20_attack(&sBattle,id,sUnits.enemy,THUNDERBOLT);
+        }
+        if ((newKeys & L_BUTTON) && id == sUnits.human)
+            (void)d20_attack(&sBattle,id,sUnits.enemy,TACKLE);
+        if ((newKeys & R_BUTTON) && id == sUnits.pokemon)
+            (void)d20_attack(&sBattle,id,sUnits.enemy,QUICK_ATTACK);
+        if ((newKeys & B_BUTTON) && sBattle.outcome == FIGHTING)
+            (void)d20_next(&sBattle);
+    }
+    if (sBattle.outcome != FIGHTING)
+        CleanupCombat();
+    else
+        RunEnemyPhases();
+    return TRUE; /* Suppress normal field movement and normal Pokémon battles. */
+}
