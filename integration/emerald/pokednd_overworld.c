@@ -27,6 +27,9 @@
 #define D20_PIKACHU_LOCAL_ID 232
 #define D20_DEBUG_CHORD (L_BUTTON | R_BUTTON | START_BUTTON)
 
+/* Exported native probe: 0=idle, 1=started, 2=deployed, 3=turn,
+ * 4=cancelled, 5=completed. Never interpret screenshots as this state. */
+EWRAM_DATA volatile u32 gPokeDnDDiagnosticState;
 static EWRAM_DATA D20Battle sBattle;
 static EWRAM_DATA D20FieldProjection sProjection;
 static EWRAM_DATA D20FieldEncounter sUnits;
@@ -160,6 +163,7 @@ static bool SpawnPikachu(void)
             continue;
         }
         sPikachuObjectId = spriteId;
+        gPokeDnDDiagnosticState = 2;
         return true;
     }
     return false;
@@ -218,6 +222,7 @@ static bool StartCombat(void)
         return false;
     }
     sActive = TRUE;
+    gPokeDnDDiagnosticState = 1;
     FreezeSurroundingActors();
     return true;
 }
@@ -349,11 +354,13 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
     }
     if (newKeys & SELECT_BUTTON) {
         CleanupCombat(TRUE);
+        gPokeDnDDiagnosticState = 4;
         return TRUE;
     }
     RunEnemyPhases();
     if (sBattle.outcome != FIGHTING) {
         CleanupCombat(FALSE);
+        gPokeDnDDiagnosticState = 5;
         return TRUE;
     }
     id = d20_current(&sBattle);
@@ -367,11 +374,15 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
             (void)d20_attack(&sBattle,id,sUnits.enemy,TACKLE);
         if ((newKeys & R_BUTTON) && id == sUnits.pokemon)
             (void)d20_attack(&sBattle,id,sUnits.enemy,QUICK_ATTACK);
-        if ((newKeys & B_BUTTON) && sBattle.outcome == FIGHTING)
-            (void)d20_next(&sBattle);
+        if ((newKeys & B_BUTTON) && sBattle.outcome == FIGHTING) {
+            if (d20_next(&sBattle))
+                gPokeDnDDiagnosticState = 3;
+        }
     }
-    if (sBattle.outcome != FIGHTING)
+    if (sBattle.outcome != FIGHTING) {
         CleanupCombat(FALSE);
+        gPokeDnDDiagnosticState = 5;
+    }
     else
         RunEnemyPhases();
     return TRUE; /* Suppress normal field movement and normal Pokémon battles. */
