@@ -73,10 +73,10 @@ if [ "${#frames[@]}" -lt 8 ]; then
   echo "Insufficient real emulator frames for diagnostic GIF" >&2
   exit 1
 fi
-convert -limit memory 128MiB -limit map 256MiB \\
-  -delay 110 "${frames[@]}" -resize 480x320 -layers Optimize \\
+convert -limit memory 128MiB -limit map 256MiB \
+  -delay 110 "${frames[@]}" -resize 480x320 -layers Optimize \
   -loop 0 "$OUT/emerald-real-mgba-diagnostic.gif"
 test -s "$OUT/emerald-real-mgba-diagnostic.gif"
-identify -format 'Diagnostic GIF: %n frames, %wx%h pixels\n' \\
+identify -format 'Diagnostic GIF: %n frames, %wx%h pixels\n' \
   "$OUT/emerald-real-mgba-diagnostic.gif" | head -n 1
 echo "Real mGBA diagnostic GIF generated; combat playability is NOT asserted."
