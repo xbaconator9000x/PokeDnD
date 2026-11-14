@@ -103,6 +103,12 @@ static void test_los(void)
     CHECK(!d20_los(&b, 1, 1, 5, 1));
     CHECK(d20_los(&b, 1, 1, 1, 5));
     CHECK(!d20_los(&b, -1, 1, 1, 5));
+    CHECK(d20_wall(&b, 2, 1, true));
+    CHECK(d20_wall(&b, 1, 2, true));
+    CHECK(!d20_los(&b, 1, 1, 2, 2)); /* Closed wall corner. */
+    CHECK(!d20_los(&b, 2, 2, 1, 1)); /* Symmetric corner blocking. */
+    CHECK(d20_wall(&b, 1, 2, false));
+    CHECK(d20_los(&b, 1, 1, 2, 2)); /* One wall is not full occlusion. */
 }
 static void test_attack_action(void)
 {
