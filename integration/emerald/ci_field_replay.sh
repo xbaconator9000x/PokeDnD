@@ -65,4 +65,18 @@ for i in $(seq 1 16); do
   if [ $((i % 4)) -eq 0 ]; then snap "11-dialogue-advance-$i"; fi
 done
 sleep 5; snap 12-final-field-candidate
-echo "Diagnostic captures complete; visual interpretation needed for gameplay claim."
+# Produce a compact, chronological animation exclusively from genuine emulator
+# window captures. This is diagnostic evidence, NOT proof of a playable battle.
+# Natural filename sorting preserves 02b/02c and numbered dialogue frames.
+mapfile -t frames < <(find "$OUT" -maxdepth 1 -name '*.png' -type f | LC_ALL=C sort -V)
+if [ "${#frames[@]}" -lt 8 ]; then
+  echo "Insufficient real emulator frames for diagnostic GIF" >&2
+  exit 1
+fi
+convert -limit memory 128MiB -limit map 256MiB \\
+  -delay 110 "${frames[@]}" -resize 480x320 -layers Optimize \\
+  -loop 0 "$OUT/emerald-real-mgba-diagnostic.gif"
+test -s "$OUT/emerald-real-mgba-diagnostic.gif"
+identify -format 'Diagnostic GIF: %n frames, %wx%h pixels\\n' \\
+  "$OUT/emerald-real-mgba-diagnostic.gif" | head -n 1
+echo "Real mGBA diagnostic GIF generated; combat playability is NOT asserted."
