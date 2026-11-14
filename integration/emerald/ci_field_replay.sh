@@ -65,6 +65,28 @@ for i in $(seq 1 16); do
   if [ $((i % 4)) -eq 0 ]; then snap "11-dialogue-advance-$i"; fi
 done
 sleep 5; snap 12-final-field-candidate
+# A second attempt after dialogue advancement is necessary: the initial chord
+# may have been sent while the title/new-game script still owned input.
+# Record each input phase separately so a reviewer can distinguish title,
+# field, encounter activation, deployment, turns and cancellation.
+xdotool keydown --window "$WINDOW" a
+xdotool keydown --window "$WINDOW" s
+key Return
+xdotool keyup --window "$WINDOW" s
+xdotool keyup --window "$WINDOW" a
+sleep 3; snap 13-late-encounter-chord
+key x
+sleep 2; snap 14-deploy-attempt
+key z
+sleep 2; snap 15-end-human-turn
+key x
+sleep 2; snap 16-pokemon-action-attempt
+key z
+sleep 2; snap 17-end-pokemon-turn
+key BackSpace
+sleep 2; snap 18-cancel-attempt
+# No frame classifier here: an animation alone cannot establish that any
+# of these inputs reached the native tactical hook.
 # Produce a compact, chronological animation exclusively from genuine emulator
 # window captures. This is diagnostic evidence, NOT proof of a playable battle.
 # Natural filename sorting preserves 02b/02c and numbered dialogue frames.
