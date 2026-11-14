@@ -3,6 +3,11 @@ on:
   push:
     branches: [main]
   pull_request:
+    paths:
+      - "gba/**"
+      - "src/d20.c"
+      - "include/d20.h"
+      - ".github/workflows/gba-demo.yml"
   workflow_dispatch:
 jobs:
   build-gba:
