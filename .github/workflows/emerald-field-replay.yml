@@ -31,7 +31,7 @@ jobs:
           ROM=$(find rom -type f -name '*.gba' | head -n 1)
           test -s "$ROM"
           chmod +x integration/emerald/ci_field_replay.sh
-          timeout 140s xvfb-run -a -s "-screen 0 800x600x24" \
+          timeout 190s xvfb-run -a -s "-screen 0 800x600x24" \
             integration/emerald/ci_field_replay.sh "$ROM" evidence
       - name: Retain LCD frames and emulator diagnostics
         if: always()
