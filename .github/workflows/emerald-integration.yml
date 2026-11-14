@@ -46,8 +46,8 @@ jobs:
           make -C upstream -j4 all
       - name: Verify native ARM hook linked into real Emerald ELF
         run: |
-          ELF=$(find upstream/build -type f -name '*.elf' | head -n 1)
-          test -n "$ELF"
+          ELF=upstream/pokeemerald.elf
+          test -s "$ELF"
           arm-none-eabi-nm "$ELF" | grep ' PokeDnD_HandleOverworldInput$'
           arm-none-eabi-nm "$ELF" | grep ' d20_field_project$'
           arm-none-eabi-nm "$ELF" | grep ' d20_deploy$'
