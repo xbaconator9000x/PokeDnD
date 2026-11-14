@@ -19,6 +19,9 @@ on:
       - "src/d20*"
       - ".github/workflows/emerald-integration.yml"
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   emerald-native:
     runs-on: ubuntu-24.04
