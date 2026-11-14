@@ -1,7 +1,7 @@
 name: PokeDnD GBA hardware demo build
 on:
   push:
-    branches: [main, "development/**"]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 jobs:
@@ -61,10 +61,11 @@ jobs:
           COLORS=$(identify -format %k evidence/mgba-lcd.png)
           echo "mGBA visible frame colors: $COLORS"
           test "$COLORS" -gt 6
-          BEFORE=$(convert evidence/mgba-lcd.png -format "%[pixel:p{76,66}]" info:)
-          AFTER=$(convert evidence/mgba-after-deploy.png -format "%[pixel:p{76,66}]" info:)
-          echo "Adjacent spawn pixel before: $BEFORE; after A: $AFTER"
+          BEFORE=$(convert evidence/mgba-lcd.png -format "%[pixel:p{74,64}]" info:)
+          AFTER=$(convert evidence/mgba-after-deploy.png -format "%[pixel:p{74,64}]" info:)
+          echo "Pokémon deployment tile before: $BEFORE; after A: $AFTER"
           test "$BEFORE" != "$AFTER"
+          test "$AFTER" = "srgb(255,222,16)"
       - uses: actions/upload-artifact@v4
         with:
           name: pokednd-mgba-boot-evidence
