@@ -36,6 +36,8 @@ static EWRAM_DATA u8 sActive;
 static EWRAM_DATA u8 sMapGroup;
 static EWRAM_DATA u8 sMapNum;
 static EWRAM_DATA u8 sElevation;
+static EWRAM_DATA s16 sEntryX;
+static EWRAM_DATA s16 sEntryY;
 
 static int AbsCoord(int a) { return a < 0 ? -a : a; }
 static int DistanceTo(int a, int b)
@@ -58,8 +60,14 @@ static bool D20MapBlocked(int wx, int wy, void *ctx)
     }
     return false;
 }
-static void CleanupCombat(void)
+static void CleanupCombat(bool8 restorePlayer)
 {
+    /* Debug cancel is non-destructive. Never teleport across a map warp. */
+    if (restorePlayer && sActive &&
+        sMapGroup == gSaveBlock1Ptr->location.mapGroup &&
+        sMapNum == gSaveBlock1Ptr->location.mapNum &&
+        gPlayerAvatar.objectEventId < OBJECT_EVENTS_COUNT)
+        MoveObjectEventToMapCoords(&gObjectEvents[gPlayerAvatar.objectEventId], sEntryX, sEntryY);
     if (sRocketObjectId < OBJECT_EVENTS_COUNT &&
         gObjectEvents[sRocketObjectId].active)
         RemoveObjectEvent(&gObjectEvents[sRocketObjectId]);
@@ -91,7 +99,11 @@ static void MoveVisual(int id)
 static bool SpawnPikachu(void)
 {
     int id = sUnits.pokemon, wx, wy;
+    u8 spriteId;
     D20Unit *human = &sBattle.units[sUnits.human];
+    /* Do not allocate overworld resources for an illegal action. */
+    if (!human->action || sBattle.units[id].deployed || sBattle.units[id].hp <= 0)
+        return false;
     const int dirX[] = {1,0,-1,0};
     const int dirY[] = {0,1,0,-1};
     for (int i = 0; i < 4; i++) {
@@ -101,17 +113,17 @@ static bool SpawnPikachu(void)
             continue;
         if (!d20_field_to_world(&sProjection,x,y,&wx,&wy))
             continue;
-        /* Deployment costs the human's actual Action. */
-        if (!d20_deploy(&sBattle, sUnits.human, id, x, y))
-            continue;
-        sPikachuObjectId = SpawnSpecialObjectEventParameterized(
+        /* Sprite allocation must succeed before the Action is committed. */
+        spriteId = SpawnSpecialObjectEventParameterized(
             OBJ_EVENT_GFX_PIKACHU, MOVEMENT_TYPE_NONE,
             D20_PIKACHU_LOCAL_ID, wx, wy, sElevation);
-        if (sPikachuObjectId == OBJECT_EVENTS_COUNT) {
-            /* Abort rather than leave an invisible active combatant. */
-            CleanupCombat();
-            return false;
+        if (spriteId == OBJECT_EVENTS_COUNT)
+            continue;
+        if (!d20_deploy(&sBattle, sUnits.human, id, x, y)) {
+            RemoveObjectEvent(&gObjectEvents[spriteId]);
+            continue;
         }
+        sPikachuObjectId = spriteId;
         return true;
     }
     return false;
@@ -144,6 +156,8 @@ static bool StartCombat(void)
     sMapGroup = gSaveBlock1Ptr->location.mapGroup;
     sMapNum = gSaveBlock1Ptr->location.mapNum;
     sElevation = player.elevation;
+    sEntryX = player.x;
+    sEntryY = player.y;
     sRocketObjectId = SpawnSpecialObjectEventParameterized(
         OBJ_EVENT_GFX_ROCKET_M, MOVEMENT_TYPE_NONE,
         D20_ROCKET_LOCAL_ID, wx, wy, sElevation);
@@ -156,7 +170,7 @@ static bool StartCombat(void)
     sBattle.units[sUnits.enemy].hp = 16;
     sBattle.units[sUnits.enemy].max_hp = 16;
     if (!d20_start(&sBattle)) {
-        CleanupCombat();
+        CleanupCombat(FALSE);
         return false;
     }
     sActive = TRUE;
@@ -220,16 +234,16 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
     /* Always yield to Emerald if the map changed unexpectedly. */
     if (sMapGroup != gSaveBlock1Ptr->location.mapGroup ||
         sMapNum != gSaveBlock1Ptr->location.mapNum) {
-        CleanupCombat();
+        CleanupCombat(FALSE);
         return FALSE;
     }
     if (newKeys & SELECT_BUTTON) {
-        CleanupCombat();
+        CleanupCombat(TRUE);
         return TRUE;
     }
     RunEnemyPhases();
     if (sBattle.outcome != FIGHTING) {
-        CleanupCombat();
+        CleanupCombat(FALSE);
         return TRUE;
     }
     id = d20_current(&sBattle);
@@ -247,7 +261,7 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
             (void)d20_next(&sBattle);
     }
     if (sBattle.outcome != FIGHTING)
-        CleanupCombat();
+        CleanupCombat(FALSE);
     else
         RunEnemyPhases();
     return TRUE; /* Suppress normal field movement and normal Pokémon battles. */
