@@ -1,0 +1,65 @@
+name: POC-02 genuine Emerald overworld source integration
+on:
+  push:
+    paths:
+      - "integration/emerald/**"
+      - "include/d20*"
+      - "src/d20*"
+      - ".github/workflows/emerald-integration.yml"
+    branches:
+      - "development/**"
+  pull_request:
+    paths:
+      - "integration/emerald/**"
+      - "include/d20*"
+      - "src/d20*"
+      - ".github/workflows/emerald-integration.yml"
+  workflow_dispatch:
+jobs:
+  emerald-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GAME_VERSION: EMERALD
+      COMPARE: 0
+      UNUSED_ERROR: 1
+    steps:
+      - name: Checkout PokeDnD source only
+        uses: actions/checkout@v4
+      - name: Install native GBA cross-toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi \
+            libpng-dev python3 build-essential
+      - name: Fetch pinned upstream privately for build
+        run: |
+          git init upstream
+          git -C upstream remote add origin https://github.com/rh-hideout/pokeemerald-expansion.git
+          git -C upstream fetch --no-tags --depth=1 origin 4da9230cf7c1f1d7b0d47b45783b202666fffece
+          git -C upstream checkout --detach FETCH_HEAD
+          test "$(git -C upstream rev-parse HEAD)" = 4da9230cf7c1f1d7b0d47b45783b202666fffece
+      - name: Apply original source-only D20 hook
+        run: python3 integration/emerald/apply.py upstream
+      - name: Compile real pokeemerald-expansion ROM
+        run: |
+          make -C upstream -j4 all
+      - name: Verify native ARM hook linked into real Emerald ELF
+        run: |
+          ELF=$(find upstream/build -type f -name '*.elf' | head -n 1)
+          test -n "$ELF"
+          arm-none-eabi-nm "$ELF" | grep ' PokeDnD_HandleOverworldInput$'
+          arm-none-eabi-nm "$ELF" | grep ' d20_field_project$'
+          arm-none-eabi-nm "$ELF" | grep ' d20_deploy$'
+          ROM=$(find upstream -maxdepth 1 -name '*.gba' | head -n 1)
+          test -n "$ROM"
+          test "$(stat -c %s "$ROM")" -lt 33554432
+          echo "Native integrated Emerald image: $(stat -c %s "$ROM") bytes"
+          sha256sum "$ROM"
+      - name: Upload private experimental integrated ROM
+        uses: actions/upload-artifact@v4
+        with:
+          name: pokednd-poc02-emerald-integrated-private
+          path: upstream/*.gba
+          if-no-files-found: error
+          retention-days: 7
