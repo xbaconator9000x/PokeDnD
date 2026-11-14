@@ -5,10 +5,17 @@
 ## Design
 
 - Gen III-style world, with turn-based battles **on the overworld map**.
-- Up to 3 humans, each commanding up to 2 Pokémon; independent party control.
+- Up to 3 humans, each commanding up to 2 Pokémon with **full direct party control**. **Planned rule:** Pokémon share their human trainer's initiative, require an Action or Bonus Action command, and otherwise take Dodge. This is not yet implemented in the current engine.
 - Sending out a Pokémon costs one human Action.
 - D20 initiative and attacks, AC, proficiency, movement, six ability scores, and saving throws.
 - Species-specific attack ability mapping: e.g. Pikachu's Thunderbolt uses CHA.
+
+## External research and battle design
+
+- [Pokémon 5e (2024) research references](docs/research/pokemon-5e.md) — official site, community combat conversion and Foundry module links; no copied third-party files.
+- [Trainer-linked initiative and command economy](docs/design/trainer-initiative-and-commands.md) — **proposed PokéDND rule**: a human's Pokémon use their trainer's initiative; Action or Bonus Action to command; uncommanded Pokémon Dodge.
+
+The current POC's independent Pokémon initiative is an earlier implementation to migrate, **not** the final design.
 
 ## What actually exists
 
