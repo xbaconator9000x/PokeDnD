@@ -1,0 +1,24 @@
+name: PokeDnD GBA hardware demo build
+on:
+  push:
+    branches: [main, "development/**"]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  build-gba:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitarm:20260610
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cross-compile standalone GBA demo
+        run: make -C gba
+      - name: Check ROM header and size
+        run: |
+          test -s gba/build/pokednd-poc.gba
+          test "$(stat -c %s gba/build/pokednd-poc.gba)" -lt 33554432
+          ls -lh gba/build/pokednd-poc.gba
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pokednd-poc-gba-unsigned-homebrew
+          path: gba/build/pokednd-poc.gba
+          if-no-files-found: error
