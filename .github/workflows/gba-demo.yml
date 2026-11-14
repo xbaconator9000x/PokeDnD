@@ -39,23 +39,33 @@ jobs:
       - name: Boot ROM in genuine mGBA and capture LCD window
         run: |
           mkdir -p evidence
-          timeout 30s xvfb-run -a -s "-screen 0 800x600x24" bash -euo pipefail -c '
+          timeout 45s xvfb-run -a -s "-screen 0 800x600x24" bash -euo pipefail -c '
             export SDL_VIDEODRIVER=x11
             export SDL_AUDIODRIVER=dummy
             mgba rom/pokednd-poc.gba >evidence/mgba.log 2>&1 &
             EMU=$!
-            sleep 6
-            if ! kill -0 "$EMU"; then cat evidence/mgba.log; exit 1; fi
-            WINDOW=$(xdotool search --onlyvisible --name "mGBA" | head -n 1)
-            if [ -z "$WINDOW" ]; then echo "No mGBA display window"; exit 1; fi
+            trap "kill -9 $EMU 2>/dev/null || true" EXIT
+            WINDOW=""
+            # GitHub runners may take several seconds to map the SDL window.
+            # With pipefail enabled an empty xdotool search used to exit before
+            # the original if-empty guard; deliberately tolerate search retries.
+            for i in $(seq 1 15); do
+              if ! kill -0 "$EMU" 2>/dev/null; then cat evidence/mgba.log; exit 1; fi
+              WINDOW=$(xdotool search --onlyvisible --name "mGBA" 2>/dev/null | sed -n "1p" || true)
+              if [ -n "$WINDOW" ]; then break; fi
+              sleep 1
+            done
+            if [ -z "$WINDOW" ]; then echo "mGBA window never became visible"; cat evidence/mgba.log; exit 1; fi
+            sleep 2
+            echo "Capture initial LCD window $WINDOW"
             timeout 5s xwd -silent -id "$WINDOW" | convert xwd:- evidence/mgba-lcd.png
             xdotool windowfocus "$WINDOW" || true
+            echo "Injecting GBA A via mGBA SDL X key mapping"
             xdotool keydown --window "$WINDOW" x
             sleep 1
             xdotool keyup --window "$WINDOW" x
-            sleep 1
+            sleep 2
             timeout 5s xwd -silent -id "$WINDOW" | convert xwd:- evidence/mgba-after-deploy.png
-            kill -9 "$EMU" || true
           '
           test -s evidence/mgba-lcd.png
           COLORS=$(identify -format %k evidence/mgba-lcd.png)
@@ -67,7 +77,8 @@ jobs:
           test "$BEFORE" != "$AFTER"
           test "$AFTER" = "srgb(255,222,16)"
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: pokednd-mgba-boot-evidence
           path: evidence/
-          if-no-files-found: error
+          if-no-files-found: warn
