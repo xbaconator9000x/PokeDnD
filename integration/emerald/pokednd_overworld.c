@@ -68,11 +68,19 @@ static void CleanupCombat(bool8 restorePlayer)
         sMapNum == gSaveBlock1Ptr->location.mapNum &&
         gPlayerAvatar.objectEventId < OBJECT_EVENTS_COUNT)
         MoveObjectEventToMapCoords(&gObjectEvents[gPlayerAvatar.objectEventId], sEntryX, sEntryY);
+    /* Object-event slots can be recycled after an unexpected map warp.
+     * Never destroy a real map NPC merely because it reused our old slot. */
     if (sRocketObjectId < OBJECT_EVENTS_COUNT &&
-        gObjectEvents[sRocketObjectId].active)
+        gObjectEvents[sRocketObjectId].active &&
+        gObjectEvents[sRocketObjectId].localId == D20_ROCKET_LOCAL_ID &&
+        gObjectEvents[sRocketObjectId].mapNum == sMapNum &&
+        gObjectEvents[sRocketObjectId].mapGroup == sMapGroup)
         RemoveObjectEvent(&gObjectEvents[sRocketObjectId]);
     if (sPikachuObjectId < OBJECT_EVENTS_COUNT &&
-        gObjectEvents[sPikachuObjectId].active)
+        gObjectEvents[sPikachuObjectId].active &&
+        gObjectEvents[sPikachuObjectId].localId == D20_PIKACHU_LOCAL_ID &&
+        gObjectEvents[sPikachuObjectId].mapNum == sMapNum &&
+        gObjectEvents[sPikachuObjectId].mapGroup == sMapGroup)
         RemoveObjectEvent(&gObjectEvents[sPikachuObjectId]);
     sActive = FALSE;
     sRocketObjectId = OBJECT_EVENTS_COUNT;
