@@ -53,7 +53,7 @@ jobs:
           arm-none-eabi-nm "$ELF" | grep ' d20_deploy$'
           ROM=$(find upstream -maxdepth 1 -name '*.gba' | head -n 1)
           test -n "$ROM"
-          test "$(stat -c %s "$ROM")" -lt 33554432
+          test "$(stat -c %s "$ROM")" -le 33554432
           echo "Native integrated Emerald image: $(stat -c %s "$ROM") bytes"
           sha256sum "$ROM"
       - name: Upload private experimental integrated ROM
