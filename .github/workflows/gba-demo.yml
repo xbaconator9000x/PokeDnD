@@ -26,6 +26,7 @@ jobs:
   emulator-boot:
     needs: build-gba
     runs-on: ubuntu-24.04
+    timeout-minutes: 4
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -38,17 +39,17 @@ jobs:
       - name: Boot ROM in genuine mGBA and capture LCD window
         run: |
           mkdir -p evidence
-          xvfb-run -a -s "-screen 0 800x600x24" bash -euo pipefail -c '
+          timeout 30s xvfb-run -a -s "-screen 0 800x600x24" bash -euo pipefail -c '
             export SDL_VIDEODRIVER=x11
+            export SDL_AUDIODRIVER=dummy
             mgba rom/pokednd-poc.gba >evidence/mgba.log 2>&1 &
             EMU=$!
             sleep 6
             if ! kill -0 "$EMU"; then cat evidence/mgba.log; exit 1; fi
             WINDOW=$(xdotool search --onlyvisible --name "mGBA" | head -n 1)
             if [ -z "$WINDOW" ]; then echo "No mGBA display window"; exit 1; fi
-            xwd -silent -id "$WINDOW" | convert xwd:- evidence/mgba-lcd.png
-            kill "$EMU" || true
-            wait "$EMU" || true
+            timeout 5s xwd -silent -id "$WINDOW" | convert xwd:- evidence/mgba-lcd.png
+            kill -9 "$EMU" || true
           '
           test -s evidence/mgba-lcd.png
           COLORS=$(identify -format %k evidence/mgba-lcd.png)
