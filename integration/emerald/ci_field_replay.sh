@@ -90,7 +90,7 @@ sleep 2; snap 18-cancel-attempt
 # The native gPokeDnDDiagnosticState must be read by a debugger/mGBA probe
 # before any workflow can assert encounter/deployment/turn acceptance.
 {
-  printf 'capture,colors,sha256\\n'
+  printf 'capture,colors,sha256\n'
   for frame in "$OUT"/*.png; do
     printf '%s,%s,%s\n' "$(basename "$frame")" \
       "$(identify -format %k "$frame")" \
@@ -100,7 +100,7 @@ sleep 2; snap 18-cancel-attempt
 cat > "$OUT/ACCEPTANCE_NOT_VERIFIED.txt" <<'EOF'
 This artifact contains genuine mGBA display captures, NOT verified tactical gameplay.
 A green workflow means the emulator and capture harness ran successfully.
-Before accepting combat, read native gPokeDnDDiagnosticState from emulated
+First read gPokeDnDTriggerCount: zero means the field hook never saw the chord.\nIf positive, read gPokeDnDStartFailure to diagnose admission rejection.\nBefore accepting combat, read native gPokeDnDDiagnosticState from emulated
 EWRAM and verify ordered transitions: 1 encounter, 2 deployment, 3 turn,
 4 cancellation (or 5 completion). Do not infer these from filenames or PNGs.
 EOF
