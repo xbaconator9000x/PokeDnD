@@ -411,9 +411,10 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
         if ((newKeys & R_BUTTON) && id == sUnits.pokemon)
             (void)d20_attack(&sBattle,id,sUnits.enemy,QUICK_ATTACK);
         if ((newKeys & B_BUTTON) && sBattle.outcome == FIGHTING) {
-            if (d20_next(&sBattle))
+            if (d20_next(&sBattle)) {
                 gPokeDnDDiagnosticState = 3;
                 gPokeDnDMilestones |= 4u;
+            }
         }
     }
     if (sBattle.outcome != FIGHTING) {
