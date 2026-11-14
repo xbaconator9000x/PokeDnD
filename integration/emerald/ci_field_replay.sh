@@ -28,8 +28,11 @@ key() {
   xdotool keyup --window "$WINDOW" "$1"
 }
 sleep 10; snap 01-startup
-sleep 12; snap 02-title-candidate
-# pokeemerald-expansion quickstart: SELECT on title skips character naming.
+sleep 12; snap 02-title-animation
+# Emerald title animation is still in progress after ~22 seconds.
+# Pressing SELECT before Task_TitleScreenPhase3 is active is ignored.
+sleep 14; snap 02b-interactive-title
+# pokeemerald-expansion quickstart: SELECT on interactive title skips naming.
 key BackSpace
 sleep 8; snap 03-after-title-select
 sleep 10; snap 04-world-candidate
