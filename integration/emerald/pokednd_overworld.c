@@ -35,6 +35,9 @@ EWRAM_DATA volatile u32 gPokeDnDDiagnosticState;
  * 4 Rocket ID collision, 5 Pikachu ID collision, 6 sprite allocation,
  * 7 initiative start. A successful activation clears this value. */
 EWRAM_DATA volatile u32 gPokeDnDStartFailure;
+/* Incremented only when the native field input hook actually sees the chord.
+ * A zero value distinguishes input/hook failures from encounter rejection. */
+EWRAM_DATA volatile u32 gPokeDnDTriggerCount;
 static EWRAM_DATA D20Battle sBattle;
 static EWRAM_DATA D20FieldProjection sProjection;
 static EWRAM_DATA D20FieldEncounter sUnits;
@@ -364,8 +367,10 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
 {
     int id;
     if (!sActive) {
-        if ((newKeys & START_BUTTON) && (heldKeys & D20_DEBUG_CHORD) == D20_DEBUG_CHORD)
+        if ((newKeys & START_BUTTON) && (heldKeys & D20_DEBUG_CHORD) == D20_DEBUG_CHORD) {
+            gPokeDnDTriggerCount++;
             return StartCombat();
+        }
         return FALSE;
     }
     /* Always yield to Emerald if the map changed unexpectedly. */
