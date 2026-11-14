@@ -38,7 +38,7 @@ int d20_add(D20Battle *b, D20Role role, int owner, int x, int y, bool deployed)
     if (role == POKEMON && (deployed || owner < 0 || owner >= b->count ||
                             b->units[owner].role != HUMAN || owned >= 2)) return -1;
     if (role == ENEMY && (!deployed || owner != -1)) return -1;
-    if (role < HUMAN || role > ENEMY || (deployed && !free_tile(b, x, y, -1))) return -1;
+    if (role > ENEMY || (deployed && !free_tile(b, x, y, -1))) return -1;
     id = b->count++; u = &b->units[id]; memset(u, 0, sizeof(*u));
     u->x = (int8_t)x; u->y = (int8_t)y; u->owner = (int8_t)owner;
     u->role = (uint8_t)role; u->team = role == ENEMY ? 1 : 0; u->deployed = deployed;
@@ -177,7 +177,7 @@ D20Attack d20_attack(D20Battle *b, int actor, int target, D20Move move)
     int range, roll, damage = 0, dice, sides;
     D20Stat stat;
     if (!b || d20_current(b) != actor || target < 0 || target >= b->count ||
-        move < TACKLE || move > SLEEP_POWDER) return result;
+        move > SLEEP_POWDER) return result;
     a = &b->units[actor]; t = &b->units[target];
     if (!a->action || a->hp <= 0 || !t->deployed || t->hp <= 0 || a->team == t->team) return result;
     range = move == THUNDERBOLT ? 5 : move == SLEEP_POWDER ? 4 : 1;
