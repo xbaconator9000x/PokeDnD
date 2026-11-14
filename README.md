@@ -14,10 +14,12 @@
 
 **POC-01:** a portable C99 tactical rules module with deterministic dice, initiative, turn ordering, three-plus-six party limits, deployment, tile-based BFS movement, blocking terrain, line of sight, four sample attacks/saving throws and automated tests.
 
-This is **not yet a playable .gba ROM**. Its host-side demo illustrates core logic only. Run locally with GCC or Clang:
+**Native GBA progress:** a separate, original Mode 3 top-down battlefield ROM now cross-compiles with devkitARM and has successfully booted in actual mGBA with a 240×160 LCD capture. This is a minimalist hardware demonstration, **not yet integrated into Emerald**; the deployment/attack controls have not yet been independently replay-verified in the emulator. The host demo illustrates the same rules logic. Run host tests with:
 
     make test
     make demo
+
+With devkitARM installed, build the standalone ROM using `make -C gba`. See [GBA demo controls](gba/README.md). Actual GBA boot evidence is in the `PokeDnD GBA hardware demo build` GitHub Actions artifacts.
 
 ## Next acceptance milestone
 
