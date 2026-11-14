@@ -9,6 +9,9 @@ on:
       - "include/d20.h"
       - ".github/workflows/gba-demo.yml"
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   build-gba:
     runs-on: ubuntu-latest
