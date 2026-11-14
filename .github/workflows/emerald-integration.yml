@@ -87,25 +87,39 @@ jobs:
           mkdir -p evidence
           ROM=$(find rom -name "*.gba" -type f | head -n 1)
           test -s "$ROM"
-          timeout 30s xvfb-run -a -s "-screen 0 800x600x24" bash -euo pipefail -c '
+          timeout 65s xvfb-run -a -s "-screen 0 800x600x24" bash -euo pipefail -c '
             export SDL_VIDEODRIVER=x11 SDL_AUDIODRIVER=dummy
             mgba "'"$ROM"'" >evidence/mgba.log 2>&1 &
             EMU=$!
-            sleep 10
-            if ! kill -0 "$EMU"; then cat evidence/mgba.log; exit 1; fi
-            WINDOW=$(xdotool search --onlyvisible --name "mGBA" | head -n 1)
-            if [ -z "$WINDOW" ]; then echo "No mGBA game window"; exit 1; fi
-            timeout 5s xwd -silent -id "$WINDOW" | convert xwd:- evidence/emerald-native-lcd.png
-            kill -9 "$EMU" || true
+            trap "kill -9 $EMU 2>/dev/null || true" EXIT
+            WINDOW=""
+            for i in $(seq 1 20); do
+              if ! kill -0 "$EMU" 2>/dev/null; then cat evidence/mgba.log; exit 1; fi
+              WINDOW=$(xdotool search --onlyvisible --name "mGBA" 2>/dev/null | sed -n "1p" || true)
+              [ -n "$WINDOW" ] && break
+              sleep 1
+            done
+            [ -n "$WINDOW" ] || { echo "No mGBA game window"; exit 1; }
+            # The boot splash briefly fades through black: count colors over
+            # several real LCD frames instead of sampling that transition.
+            for i in $(seq 1 12); do
+              timeout 5s xwd -silent -id "$WINDOW" | convert xwd:- evidence/emerald-native-lcd.png
+              COLORS=$(identify -format %k evidence/emerald-native-lcd.png)
+              echo "Emerald native mGBA LCD colors, sample $i: $COLORS"
+              [ "$COLORS" -gt 8 ] && exit 0
+              sleep 2
+            done
+            echo "No sufficiently rendered Emerald frame observed"
+            exit 1
           '
           test -s evidence/emerald-native-lcd.png
           COLORS=$(identify -format %k evidence/emerald-native-lcd.png)
-          echo "Rendered Emerald window colors: $COLORS"
           test "$COLORS" -gt 8
       - name: Upload genuine mGBA LCD evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pokednd-poc02-emerald-native-boot-evidence
           path: evidence/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
