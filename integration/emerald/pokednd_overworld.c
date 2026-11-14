@@ -231,24 +231,52 @@ static void EnemyPhase(void)
         DistanceTo(sUnits.enemy,sUnits.pokemon) < DistanceTo(sUnits.enemy,target))
         target = sUnits.pokemon;
     if (DistanceTo(sUnits.enemy,target) > 1) {
-        /* Try every orthogonal neighbour. A blocked preferred axis must not
-         * leave the opponent stationary when another legal step exists. */
+        /* Breadth-first pursuit navigates around terrain rather than getting
+         * trapped by a wall when no immediately closer tile is available.
+         * Work on the bounded tactical grid, not the full Emerald map. */
         static const int stepX[4] = { 0, 1, 0, -1 };
         static const int stepY[4] = { -1, 0, 1, 0 };
+        int distances[D20_H][D20_W];
+        int queueX[D20_W * D20_H], queueY[D20_W * D20_H];
+        int head = 0, tail = 0, best = -1;
         D20Unit *enemy = &sBattle.units[sUnits.enemy];
         D20Unit *victim = &sBattle.units[target];
-        int best = -1;
-        int bestDistance = AbsCoord(enemy->x - victim->x)
-                         + AbsCoord(enemy->y - victim->y);
+        for (int y = 0; y < D20_H; y++)
+            for (int x = 0; x < D20_W; x++)
+                distances[y][x] = -1;
+        distances[victim->y][victim->x] = 0;
+        queueX[tail] = victim->x;
+        queueY[tail++] = victim->y;
+        while (head < tail) {
+            int x = queueX[head], y = queueY[head++];
+            for (int i = 0; i < 4; i++) {
+                int nx = x + stepX[i], ny = y + stepY[i];
+                bool occupied = false;
+                if (nx < 0 || nx >= D20_W || ny < 0 || ny >= D20_H ||
+                    sBattle.map[ny][nx] == '#' || distances[ny][nx] >= 0)
+                    continue;
+                for (int j = 0; j < sBattle.count; j++) {
+                    D20Unit *other = &sBattle.units[j];
+                    if (j != sUnits.enemy && j != target && other->deployed &&
+                        other->hp > 0 && other->x == nx && other->y == ny) {
+                        occupied = true;
+                        break;
+                    }
+                }
+                if (occupied) continue;
+                distances[ny][nx] = distances[y][x] + 1;
+                queueX[tail] = nx;
+                queueY[tail++] = ny;
+            }
+        }
+        /* A neighbour may increase Manhattan distance while still being the
+         * first step of the shortest navigable route around a wall. */
+        int bestDistance = D20_W * D20_H + 1;
         for (int i = 0; i < 4; i++) {
-            int x = enemy->x + stepX[i];
-            int y = enemy->y + stepY[i];
-            int distance = AbsCoord(x - victim->x) + AbsCoord(y - victim->y);
+            int x = enemy->x + stepX[i], y = enemy->y + stepY[i];
             if (x < 0 || x >= D20_W || y < 0 || y >= D20_H ||
-                sBattle.map[y][x] == '#' || distance >= bestDistance)
+                distances[y][x] < 0 || distances[y][x] >= bestDistance)
                 continue;
-            /* Avoid walking into an occupied cell. d20_walk remains the
-             * authoritative validator for movement points and legality. */
             bool occupied = false;
             for (int j = 0; j < sBattle.count; j++) {
                 D20Unit *other = &sBattle.units[j];
@@ -259,8 +287,8 @@ static void EnemyPhase(void)
                 }
             }
             if (!occupied) {
+                bestDistance = distances[y][x];
                 best = i;
-                bestDistance = distance;
             }
         }
         if (best >= 0 && d20_walk(&sBattle, sUnits.enemy,
