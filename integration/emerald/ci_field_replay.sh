@@ -92,8 +92,8 @@ sleep 2; snap 18-cancel-attempt
 {
   printf 'capture,colors,sha256\\n'
   for frame in "$OUT"/*.png; do
-    printf '%s,%s,%s\\n' "$(basename "$frame")" \\
-      "$(identify -format %k "$frame")" \\
+    printf '%s,%s,%s\n' "$(basename "$frame")" \
+      "$(identify -format %k "$frame")" \
       "$(sha256sum "$frame" | cut -d' ' -f1)"
   done
 } > "$OUT/frame-manifest.csv"
