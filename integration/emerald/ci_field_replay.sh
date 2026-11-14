@@ -85,8 +85,25 @@ key z
 sleep 2; snap 17-end-pokemon-turn
 key BackSpace
 sleep 2; snap 18-cancel-attempt
-# No frame classifier here: an animation alone cannot establish that any
-# of these inputs reached the native tactical hook.
+# Diagnostic screenshots are not acceptance evidence. Record image changes
+# around the encounter attempt and refuse to label a static replay playable.
+# The native gPokeDnDDiagnosticState must be read by a debugger/mGBA probe
+# before any workflow can assert encounter/deployment/turn acceptance.
+{
+  printf 'capture,colors,sha256\\n'
+  for frame in "$OUT"/*.png; do
+    printf '%s,%s,%s\\n' "$(basename "$frame")" \\
+      "$(identify -format %k "$frame")" \\
+      "$(sha256sum "$frame" | cut -d' ' -f1)"
+  done
+} > "$OUT/frame-manifest.csv"
+cat > "$OUT/ACCEPTANCE_NOT_VERIFIED.txt" <<'EOF'
+This artifact contains genuine mGBA display captures, NOT verified tactical gameplay.
+A green workflow means the emulator and capture harness ran successfully.
+Before accepting combat, read native gPokeDnDDiagnosticState from emulated
+EWRAM and verify ordered transitions: 1 encounter, 2 deployment, 3 turn,
+4 cancellation (or 5 completion). Do not infer these from filenames or PNGs.
+EOF
 # Produce a compact, chronological animation exclusively from genuine emulator
 # window captures. This is diagnostic evidence, NOT proof of a playable battle.
 # Natural filename sorting preserves 02b/02c and numbered dialogue frames.
