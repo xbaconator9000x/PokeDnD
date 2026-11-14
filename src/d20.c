@@ -155,8 +155,15 @@ bool d20_los(const D20Battle *b, int x0, int y0, int x1, int y1)
     err = dx - dy;
     while (x0 != x1 || y0 != y1) {
         int twice = 2 * err;
+        int previousX = x0, previousY = y0;
         if (twice > -dy) { err -= dy; x0 += sx; }
         if (twice < dx) { err += dx; y0 += sy; }
+        /* Avoid seeing diagonally through a fully closed wall corner.
+         * A single adjacent wall still allows visibility; cover can be
+         * modelled separately once 5.5e cover rules are implemented. */
+        if (previousX != x0 && previousY != y0 &&
+            b->map[previousY][x0] == '#' &&
+            b->map[y0][previousX] == '#') return false;
         if ((x0 != x1 || y0 != y1) && b->map[y0][x0] == '#') return false;
     }
     return true;
