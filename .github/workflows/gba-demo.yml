@@ -49,12 +49,22 @@ jobs:
             WINDOW=$(xdotool search --onlyvisible --name "mGBA" | head -n 1)
             if [ -z "$WINDOW" ]; then echo "No mGBA display window"; exit 1; fi
             timeout 5s xwd -silent -id "$WINDOW" | convert xwd:- evidence/mgba-lcd.png
+            xdotool windowfocus "$WINDOW"
+            xdotool keydown --window "$WINDOW" x
+            sleep 1
+            xdotool keyup --window "$WINDOW" x
+            sleep 1
+            timeout 5s xwd -silent -id "$WINDOW" | convert xwd:- evidence/mgba-after-deploy.png
             kill -9 "$EMU" || true
           '
           test -s evidence/mgba-lcd.png
           COLORS=$(identify -format %k evidence/mgba-lcd.png)
           echo "mGBA visible frame colors: $COLORS"
           test "$COLORS" -gt 6
+          BEFORE=$(convert evidence/mgba-lcd.png -format "%[pixel:p{76,66}]" info:)
+          AFTER=$(convert evidence/mgba-after-deploy.png -format "%[pixel:p{76,66}]" info:)
+          echo "Adjacent spawn pixel before: $BEFORE; after A: $AFTER"
+          test "$BEFORE" != "$AFTER"
       - uses: actions/upload-artifact@v4
         with:
           name: pokednd-mgba-boot-evidence
