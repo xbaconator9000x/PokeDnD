@@ -96,6 +96,30 @@ class OutcomeReplayTests(unittest.TestCase):
         self.assertRaisesRegex(ValueError, "exactly one checkpoint",
                                outcomes.validate, rows)
 
+    def test_fake_intermediate_checkpoint_rejected(self):
+        rows = good_trace()
+        rows[1]["milestones"] = "3"
+        self.assertRaisesRegex(ValueError, "observed native attack/turn",
+                               outcomes.validate, rows)
+
+    def test_intermediate_from_other_encounter_rejected(self):
+        rows = good_trace()
+        rows[6]["trigger_count"] = "2"
+        self.assertRaisesRegex(ValueError, "wrong encounter",
+                               outcomes.validate, rows)
+
+    def test_intermediate_early_ack_rejected(self):
+        rows = good_trace()
+        rows[1]["outcome_acks"] = "1"
+        self.assertRaisesRegex(ValueError, "before confirmation",
+                               outcomes.validate, rows)
+
+    def test_intermediate_regression_rejected(self):
+        rows = good_trace()
+        rows[1]["milestones"] = "0"
+        self.assertRaisesRegex(ValueError, "regressed",
+                               outcomes.validate, rows)
+
     def test_missing_register_rejected(self):
         rows = good_trace()
         rows[0].pop("last_outcome")
