@@ -124,11 +124,19 @@ for row in rows:
 # A single synthetic or stale all-bits-set row is not a replay trace.
 # Require sequential emulator observations of activation, deployment and turn.
 # Trigger counts must never decrease and milestone bits must be monotonic.
-if len(observed) < 3:
-    raise SystemExit("FAIL: require at least three ordered runtime samples")
+if len(observed) < 4:
+    raise SystemExit("FAIL: require baseline, activation, deployment and turn samples")
+if observed[0][1] != 0:
+    raise SystemExit("FAIL: runtime admission failure observed")
 for previous, current in zip(observed, observed[1:]):
     if current[0] < previous[0]:
         raise SystemExit("FAIL: runtime trigger count regressed")
+    if current[0] > previous[0] + 1:
+        raise SystemExit("FAIL: missing trigger attempts in runtime trace")
+    if current[1] != 0:
+        raise SystemExit("FAIL: runtime admission failure observed")
+    if current[3] not in (0, 1, 2, 3, 4, 5):
+        raise SystemExit("FAIL: invalid native diagnostic state")
     if (current[2] & previous[2]) != previous[2]:
         raise SystemExit("FAIL: runtime milestones regressed")
 # A valid encounter must have a clean pre-trigger baseline, then distinct
