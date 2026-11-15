@@ -50,6 +50,21 @@ class RuntimeProbeExecutionTests(unittest.TestCase):
         self.assertNotEqual(run_trace([(0, 0, 0, 0), (2, 0, 1, 1),
                                        (2, 0, 3, 2), (2, 0, 7, 3)])[0], 0)
 
+    def test_hidden_skipped_attempt_rejected(self):
+        self.assertNotEqual(run_trace([(0, 0, 0, 0), (1, 0, 1, 1),
+                                       (1, 0, 3, 2), (1, 0, 7, 3),
+                                       (4, 0, 7, 3)])[0], 0)
+
+    def test_late_admission_failure_rejected(self):
+        self.assertNotEqual(run_trace([(0, 0, 0, 0), (1, 0, 1, 1),
+                                       (1, 0, 3, 2), (1, 0, 7, 3),
+                                       (1, 2, 7, 3)])[0], 0)
+
+    def test_invalid_native_state_rejected(self):
+        self.assertNotEqual(run_trace([(0, 0, 0, 0), (1, 0, 1, 1),
+                                       (1, 0, 3, 2), (1, 0, 7, 3),
+                                       (1, 0, 7, 99)])[0], 0)
+
     def test_no_baseline_rejected(self):
         self.assertNotEqual(run_trace([(1, 0, 1), (1, 0, 3), (1, 0, 7)])[0], 0)
 
