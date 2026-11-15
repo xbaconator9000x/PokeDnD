@@ -17,8 +17,10 @@ NAMES = (
     "gPokeDnDStartFailure",
     "gPokeDnDMilestones",
     "gPokeDnDDiagnosticState",
+    "gPokeDnDPostCancelMoves",
 )
-FIELDS = ("label", "trigger_count", "start_failure", "milestones", "diagnostic_state")
+FIELDS = ("label", "trigger_count", "start_failure", "milestones",
+          "diagnostic_state", "post_cancel_moves")
 
 
 def symbol_addresses(elf: Path, nm: str = "arm-none-eabi-nm"):
@@ -147,8 +149,7 @@ def serve(elf, out, port, nm):
                         continue
                     try:
                         values = gdb.snapshot(addresses)
-                        row = [label, values[NAMES[0]], values[NAMES[1]],
-                               values[NAMES[2]], values[NAMES[3]]]
+                        row = [label] + [values[name] for name in NAMES]
                         with csv_path.open("a", newline="") as file:
                             csv.writer(file).writerow(row)
                         client.sendall(("OK " + label + " " +
