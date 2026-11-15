@@ -74,7 +74,9 @@ bool d20_start(D20Battle *b)
         if (b->units[i].team) foes++; else allies++;
     }
     if (!allies || !foes) return false;
-    /* d20_next increments the round when wrapping from cursor -1 to 0.\n     * Start at zero so the first initiative turn belongs to round one. */\n    b->round = 0; b->cursor = -1; b->started = 1;
+    /* d20_next increments the round when wrapping from cursor -1 to 0.
+     * Start at zero so the first initiative turn belongs to round one. */
+    b->round = 0; b->cursor = -1; b->started = 1;
     for (int i = 0; i < b->count; i++) if (b->units[i].deployed && b->units[i].hp > 0 && b->units[i].role != POKEMON) {
         D20Unit *u = &b->units[i];
         u->initiative = (int16_t)(d20_roll(b, 20) + d20_mod(u->stats[DEX]));
