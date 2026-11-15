@@ -239,6 +239,26 @@ static void test_uncommanded_dodge_and_invalid_owner(void)
     CHECK(!d20_walk(&b,p,3,4));
     CHECK(!d20_attack(&b,p,e,THUNDERBOLT).legal);
 }
+static void test_first_round_and_deployment_cooldown(void)
+{
+    D20Battle b;
+    int h, p, e;
+    d20_init(&b, 20261115);
+    h = d20_add(&b, HUMAN, -1, 1, 4, true);
+    p = d20_add(&b, POKEMON, h, 1, 4, false);
+    e = d20_add(&b, ENEMY, -1, 5, 4, true);
+    CHECK(h >= 0 && p >= 0 && e >= 0);
+    CHECK(d20_start(&b));
+    CHECK(b.round == 1); /* First actor must not start in round two. */
+    CHECK(seek(&b, h));
+    CHECK(b.round == 1);
+    CHECK(d20_deploy(&b, h, p, 2, 4));
+    CHECK(b.units[p].ready_round == 2);
+    CHECK(!d20_command(&b, h, p, true));
+    CHECK(next_time(&b, h));
+    CHECK(b.round == 2);
+    CHECK(d20_command(&b, h, p, true));
+}
 static void test_invalid_actor_ids_fail_closed(void)
 {
     D20Battle b;
@@ -279,6 +299,7 @@ int main(void)
     test_dodge_grants_attack_disadvantage();
     test_uncommanded_dodge_and_invalid_owner();
     test_invalid_actor_ids_fail_closed();
-    printf("PASS: PokeDnD trainer-initiative D20 core (%d assertions, 12 scenarios)\n", assertions);
+    test_first_round_and_deployment_cooldown();
+    printf("PASS: PokeDnD trainer-initiative D20 core (%d assertions, 13 scenarios)\n", assertions);
     return 0;
 }
