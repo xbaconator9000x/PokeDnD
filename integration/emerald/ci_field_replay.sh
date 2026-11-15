@@ -297,7 +297,8 @@ for i in range(len(observed) - 8):
             and (turned[2] & 255) == 135
             and (commanded[2] & 255) == 167
             and (attacked[2] & 255) == 231
-            and (dashed[2] & 255) == 231\n            and (cancelled[2] & 255) == 239
+            and (dashed[2] & 255) == 231
+            and (cancelled[2] & 255) == 239
             and (resumed[2] & 255) == 239):
         passed = True
         break
