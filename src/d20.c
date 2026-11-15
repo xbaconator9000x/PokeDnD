@@ -183,7 +183,7 @@ bool d20_dash(D20Battle *b, int actor)
     if (!b || actor < 0 || actor >= b->count || d20_actor(b) != actor)
         return false;
     u = &b->units[actor];
-    if (!u->deployed || u->hp <= 0 || !u->action ||
+    if (!u->deployed || u->hp <= 0 || !u->action || !u->speed ||
         (unsigned int)u->movement + u->speed > 255u)
         return false;
     u->action = 0;
