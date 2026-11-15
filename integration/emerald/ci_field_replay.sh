@@ -117,8 +117,10 @@ key z
 sleep 2; snap 15-end-human-turn
 key s
 sleep 2; snap 16-trainer-bonus-command-attempt
+sample commanded
 key x
 sleep 2; snap 17-commanded-thunderbolt-attempt
+sample attacked
 key z
 sleep 2; snap 17b-return-to-trainer
 key z
@@ -165,8 +167,8 @@ for row in rows:
 # A single synthetic or stale all-bits-set row is not a replay trace.
 # Require sequential emulator observations of activation, deployment and turn.
 # Trigger counts must never decrease and milestone bits must be monotonic.
-if len(observed) < 4:
-    raise SystemExit("FAIL: require baseline, activation, deployment and turn samples")
+if len(observed) < 7:
+    raise SystemExit("FAIL: require baseline, start, deploy, turn, command, attack and cancel samples")
 if observed[0][1] != 0:
     raise SystemExit("FAIL: runtime admission failure observed")
 for previous, current in zip(observed, observed[1:]):
@@ -184,22 +186,26 @@ for previous, current in zip(observed, observed[1:]):
 # observations of start, deployment and turn for the same trigger attempt.
 # Reject failure codes at any point during the accepted attempt.
 passed = False
-for i in range(len(observed) - 3):
-    baseline, started, deployed, turned = observed[i:i + 4]
+for i in range(len(observed) - 6):
+    baseline, started, deployed, turned, commanded, attacked, cancelled = observed[i:i + 7]
     attempt = started[0]
     if (baseline[0] + 1 == attempt and baseline[1] == 0
-            and baseline[2] & 7 == 0 and baseline[3] == 0
+            and baseline[2] == 0 and baseline[3] == 0
             and all(row[0] == attempt and row[1] == 0
-                    for row in (started, deployed, turned))
+                    for row in (started, deployed, turned, commanded, attacked, cancelled))
             and started[3] == 1 and deployed[3] == 2 and turned[3] == 3
-            and (started[2] & 7) == 1
-            and (deployed[2] & 7) == 3
-            and (turned[2] & 7) == 7):
+            and commanded[3] == 3 and attacked[3] == 3 and cancelled[3] == 4
+            and (started[2] & 255) == 1
+            and (deployed[2] & 255) == 3
+            and (turned[2] & 135) == 135
+            and (commanded[2] & 32) == 32
+            and (attacked[2] & 96) == 96
+            and (cancelled[2] & 239) == 239):
         passed = True
         break
 (out / "runtime-probe-verdict.txt").write_text(
     ("PASS" if passed else "FAIL") +
-    ": observed native trigger, admission, deployment and turn milestones plus native states\n"
+    ": live mGBA EWRAM proves encounter, deployment, turn, Dodge, command, attack and cancellation\n"
 )
 if not passed:
     raise SystemExit("FAIL: runtime probe does not establish tactical gameplay")
