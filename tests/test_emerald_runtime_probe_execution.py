@@ -24,10 +24,11 @@ def validator_source():
 def run_trace(rows):
     rows = [(*row, {0: 0, 1: 1, 3: 2, 7: 3}.get(row[2], 0))
             if len(row) == 3 else row for row in rows]
+    rows = [(*row, 0) if len(row) == 4 else row for row in rows]
     with tempfile.TemporaryDirectory() as temp:
         folder = pathlib.Path(temp)
         csv = folder / "trace.csv"
-        csv.write_text("trigger_count,start_failure,milestones,diagnostic_state\n" + "".join(
+        csv.write_text("trigger_count,start_failure,milestones,diagnostic_state,post_cancel_moves\n" + "".join(
             ",".join(str(value) for value in row) + "\n" for row in rows))
         result = subprocess.run(
             [sys.executable, "-c", validator_source(), str(csv), str(folder)],
@@ -38,11 +39,33 @@ def run_trace(rows):
 
 class RuntimeProbeExecutionTests(unittest.TestCase):
     def test_real_ordered_trace_passes(self):
-        status, verdict = run_trace([(0, 0, 0, 0), (1, 0, 1, 1), (1, 0, 3, 2),
-                                     (1, 0, 135, 3), (1, 0, 167, 3),
-                                     (1, 0, 231, 3), (1, 0, 239, 4)])
+        status, verdict = run_trace([(0, 0, 0, 0, 0), (1, 0, 1, 1, 0),
+                                     (1, 0, 3, 2, 0), (1, 0, 135, 3, 0),
+                                     (1, 0, 167, 3, 0), (1, 0, 231, 3, 0),
+                                     (1, 0, 239, 4, 0), (1, 0, 239, 4, 1)])
         self.assertEqual(status, 0)
         self.assertTrue(verdict.startswith("PASS"))
+
+    def test_no_native_movement_after_cancel_rejected(self):
+        trace = [(0, 0, 0, 0, 0), (1, 0, 1, 1, 0),
+                 (1, 0, 3, 2, 0), (1, 0, 135, 3, 0),
+                 (1, 0, 167, 3, 0), (1, 0, 231, 3, 0),
+                 (1, 0, 239, 4, 0), (1, 0, 239, 4, 0)]
+        self.assertNotEqual(run_trace(trace)[0], 0)
+
+    def test_early_movement_without_post_cancel_step_rejected(self):
+        trace = [(0, 0, 0, 0, 0), (1, 0, 1, 1, 0),
+                 (1, 0, 3, 2, 0), (1, 0, 135, 3, 0),
+                 (1, 0, 167, 3, 0), (1, 0, 231, 3, 1),
+                 (1, 0, 239, 4, 1), (1, 0, 239, 4, 1)]
+        self.assertNotEqual(run_trace(trace)[0], 0)
+
+    def test_native_field_counter_regression_rejected(self):
+        trace = [(0, 0, 0, 0, 0), (1, 0, 1, 1, 0),
+                 (1, 0, 3, 2, 0), (1, 0, 135, 3, 0),
+                 (1, 0, 167, 3, 0), (1, 0, 231, 3, 1),
+                 (1, 0, 239, 4, 0), (1, 0, 239, 4, 1)]
+        self.assertNotEqual(run_trace(trace)[0], 0)
 
     def test_attack_already_spent_before_command_rejected(self):
         # A later A press cannot prove an attack if unrelated earlier inputs
