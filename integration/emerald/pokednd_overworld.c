@@ -3,10 +3,11 @@
  * Original homebrew integration code. No ROM bytes or new art assets.
  *
  * L+R+START on the field triggers a one-human/one-Pikachu/one-Rocket encounter.
- * During combat: D-pad moves the currently active ally; A sends out Pikachu
- * as the human's Action or Pikachu uses Thunderbolt; L performs a human Tackle;
- * R performs Pikachu Quick Attack; B ends a friendly turn;
- * SELECT cancels the encounter without modifying the map or save.
+ * In combat the human and Pokemon share one initiative. A human deploys with
+ * A, commands via L=Action or R=Bonus Action, or attacks via START.
+ * A commanded Pokemon uses A=Thunderbolt or R=Quick Attack. B selects human
+ * again, then ends the trainer turn. Uncommanded Pokemon Dodges automatically.
+ * SELECT cancels without changing the map or save.
  *
  * This is a debug encounter, not a replacement for normal Pokemon battles.
  */
@@ -30,8 +31,8 @@
 /* Exported native probe: 0=idle, 1=started, 2=deployed, 3=turn,
  * 4=cancelled, 5=completed. Never interpret screenshots as this state. */
 EWRAM_DATA volatile u32 gPokeDnDDiagnosticState;
-/* Sticky per-attempt milestones: bit 0=start, 1=deploy, 2=turn,
- * 3=cancel, 4=finish. Unlike the last-state register, intermediate
+/* Sticky milestones: 0=start, 1=deploy, 2=turn, 3=cancel, 4=finish,
+ * 5=trainer-command, 6=Pokemon attack, 7=uncommanded Dodge. Unlike the last-state register, intermediate
  * transitions remain inspectable after the replay has moved on. */
 EWRAM_DATA volatile u32 gPokeDnDMilestones;
 /* Nonzero rejection codes make a vanilla-only replay actionable:
@@ -357,7 +358,7 @@ static void RunEnemyPhases(void)
 }
 static void MoveSelected(u16 newKeys)
 {
-    int id = d20_current(&sBattle), x, y;
+    int id = d20_actor(&sBattle), x, y;
     D20Unit *unit;
     if (id < 0 || id == sUnits.enemy) return;
     unit = &sBattle.units[id];
@@ -399,21 +400,40 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
         gPokeDnDMilestones |= 16u;
         return TRUE;
     }
-    id = d20_current(&sBattle);
-    if (id == sUnits.human || id == sUnits.pokemon) {
+    id = d20_actor(&sBattle);
+    if (d20_current(&sBattle) == sUnits.human &&
+        (id == sUnits.human || id == sUnits.pokemon)) {
         MoveSelected(newKeys);
-        if (newKeys & A_BUTTON) {
-            if (id == sUnits.human) (void)SpawnPikachu();
-            else (void)d20_attack(&sBattle,id,sUnits.enemy,THUNDERBOLT);
+        if (id == sUnits.human) {
+            /* A is deployment. Both command types pay the trainer budget. */
+            if ((newKeys & A_BUTTON) && !sBattle.units[sUnits.pokemon].deployed)
+                (void)SpawnPikachu();
+            if ((newKeys & L_BUTTON) &&
+                d20_command(&sBattle,sUnits.human,sUnits.pokemon,false))
+                gPokeDnDMilestones |= 32u;
+            if ((newKeys & R_BUTTON) &&
+                d20_command(&sBattle,sUnits.human,sUnits.pokemon,true))
+                gPokeDnDMilestones |= 32u;
+            if (newKeys & START_BUTTON)
+                (void)d20_attack(&sBattle,sUnits.human,sUnits.enemy,TACKLE);
+        } else {
+            D20Attack result = {0};
+            if (newKeys & A_BUTTON)
+                result = d20_attack(&sBattle,id,sUnits.enemy,THUNDERBOLT);
+            else if (newKeys & R_BUTTON)
+                result = d20_attack(&sBattle,id,sUnits.enemy,QUICK_ATTACK);
+            if (result.legal)
+                gPokeDnDMilestones |= 64u;
         }
-        if ((newKeys & L_BUTTON) && id == sUnits.human)
-            (void)d20_attack(&sBattle,id,sUnits.enemy,TACKLE);
-        if ((newKeys & R_BUTTON) && id == sUnits.pokemon)
-            (void)d20_attack(&sBattle,id,sUnits.enemy,QUICK_ATTACK);
         if ((newKeys & B_BUTTON) && sBattle.outcome == FIGHTING) {
-            if (d20_next(&sBattle)) {
+            if (id == sUnits.pokemon) {
+                (void)d20_select(&sBattle,sUnits.human);
+            } else if (d20_next(&sBattle)) {
                 gPokeDnDDiagnosticState = 3;
                 gPokeDnDMilestones |= 4u;
+                if (sBattle.units[sUnits.pokemon].deployed &&
+                    sBattle.units[sUnits.pokemon].dodging)
+                    gPokeDnDMilestones |= 128u;
             }
         }
     }
