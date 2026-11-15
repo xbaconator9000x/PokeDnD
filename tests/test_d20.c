@@ -13,6 +13,10 @@ static int seek(D20Battle *b, int owner)
     }
     return 0;
 }
+static int next_time(D20Battle *b, int owner)
+{
+    return d20_next(b) && seek(b, owner);
+}
 static void setup(D20Battle *b, int *h, int *p, int *e)
 {
     d20_init(b, 12345);
@@ -75,7 +79,7 @@ static void test_initiative_deploy_and_command(void)
     CHECK(b.units[p].ready_round==b.round+1);
     CHECK(!d20_command(&b,h,p,true));  /* Deployment turn has no free attack. */
     CHECK(!d20_deploy(&b,h,p,1,3));
-    CHECK(seek(&b,h));
+    CHECK(next_time(&b,h));
     CHECK(b.round>=b.units[p].ready_round);
     CHECK(b.units[p].dodging && !b.units[p].commanded);
     CHECK(!d20_select(&b,p));          /* Must pay a command cost first. */
@@ -145,7 +149,7 @@ static void test_pikachu_cha_move_and_switch_back(void)
     setup(&b,&h,&p,&e);
     CHECK(seek(&b,h));
     CHECK(d20_deploy(&b,h,p,2,4));
-    CHECK(seek(&b,h));
+    CHECK(next_time(&b,h));
     CHECK(d20_command(&b,h,p,true));
     r=d20_attack(&b,p,e,THUNDERBOLT);
     CHECK(r.legal);
@@ -163,7 +167,7 @@ static void test_wall_prevents_thunderbolt(void)
     CHECK(d20_wall(&b,3,4,true));
     CHECK(seek(&b,h));
     CHECK(d20_deploy(&b,h,p,2,4));
-    CHECK(seek(&b,h));
+    CHECK(next_time(&b,h));
     CHECK(d20_command(&b,h,p,true));
     CHECK(!d20_attack(&b,p,e,THUNDERBOLT).legal);
     CHECK(b.units[p].action==1);
@@ -182,9 +186,9 @@ static void test_two_pokemon_two_resources(void)
     CHECK(d20_start(&b));
     CHECK(seek(&b,h));
     CHECK(d20_deploy(&b,h,p1,2,4));
-    CHECK(seek(&b,h));
+    CHECK(next_time(&b,h));
     CHECK(d20_deploy(&b,h,p2,1,5));
-    CHECK(seek(&b,h));
+    CHECK(next_time(&b,h));
     CHECK(b.order_count==2);
     CHECK(b.units[p1].dodging&&b.units[p2].dodging);
     CHECK(d20_command(&b,h,p1,true));
@@ -197,7 +201,7 @@ static void test_two_pokemon_two_resources(void)
     CHECK(!d20_command(&b,h,p2,true));
     CHECK(d20_select(&b,h));
     CHECK(!d20_attack(&b,h,e,TACKLE).legal);
-    CHECK(seek(&b,h));
+    CHECK(next_time(&b,h));
     CHECK(b.units[p1].dodging&&b.units[p2].dodging);
     CHECK(!b.units[p1].commanded&&!b.units[p2].commanded);
 }
@@ -226,11 +230,11 @@ static void test_uncommanded_dodge_and_invalid_owner(void)
     setup(&b,&h,&p,&e);
     CHECK(seek(&b,h));
     CHECK(d20_deploy(&b,h,p,2,4));
-    CHECK(seek(&b,h));
+    CHECK(next_time(&b,h));
     CHECK(!d20_command(&b,e,p,true));
     CHECK(!d20_command(&b,h,e,true));
     CHECK(!d20_command(&b,h,p,false) || b.units[p].commanded);
-    CHECK(seek(&b,h));
+    CHECK(next_time(&b,h));
     CHECK(b.units[p].dodging && !b.units[p].commanded);
     CHECK(!d20_walk(&b,p,3,4));
     CHECK(!d20_attack(&b,p,e,THUNDERBOLT).legal);
