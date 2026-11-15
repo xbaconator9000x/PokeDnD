@@ -26,6 +26,7 @@ static const u8 sHudColors[] = {
 };
 static const u8 sTxtRound[]     = _("D20 R");
 static const u8 sTxtTurn[]      = _("   TURN ");
+static const u8 sTxtMove[]      = _(" MV");
 static const u8 sTxtHuman[]     = _("HUMAN");
 static const u8 sTxtPokemon[]   = _("PIKACHU");
 static const u8 sTxtRocket[]    = _("ROCKET");
@@ -35,7 +36,7 @@ static const u8 sTxtR[]         = _("  R ");
 static const u8 sTxtSlash[]     = _("/");
 static const u8 sTxtStowed[]    = _("STOWED");
 static const u8 sTxtDeploy[]    = _("A:DEPLOY  START:HIT  B:END");
-static const u8 sTxtTrainer[]   = _("R:CMD  START:HIT  B:END");
+static const u8 sTxtTrainer[]   = _("R:CMD L+START:DASH B:END");
 static const u8 sTxtPokemonAct[]= _("A:BOLT  R:QUICK  B:BACK");
 static const u8 sTxtEnemyTurn[] = _("ENEMY TURN");
 static const u8 sTxtFinish[]    = _("A/B: RETURN TO FIELD");
@@ -106,6 +107,10 @@ void PokeDnD_HudRedraw(const D20Battle *battle)
         StringAppend(line, sTxtPokemon);
     else
         StringAppend(line, sTxtHuman);
+    if (actor >= 0 && actor < battle->count) {
+        StringAppend(line, sTxtMove);
+        AppendNumber(line, battle->units[actor].movement);
+    }
     PrintLine(line, 0);
 
     StringCopy(line, sTxtH);
