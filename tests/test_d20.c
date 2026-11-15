@@ -239,6 +239,32 @@ static void test_uncommanded_dodge_and_invalid_owner(void)
     CHECK(!d20_walk(&b,p,3,4));
     CHECK(!d20_attack(&b,p,e,THUNDERBOLT).legal);
 }
+static void test_invalid_actor_ids_fail_closed(void)
+{
+    D20Battle b;
+    int h, p, e;
+    d20_init(&b, 2026);
+    h = d20_add(&b, HUMAN, -1, 1, 4, true);
+    p = d20_add(&b, POKEMON, h, 1, 4, false);
+    e = d20_add(&b, ENEMY, -1, 5, 4, true);
+    CHECK(h == 0 && p == 1 && e == 2);
+    /* Before initiative, current and selected are both -1.
+     * Never interpret that sentinel as a valid caller index. */
+    CHECK(!d20_walk(&b, -1, 2, 4));
+    CHECK(!d20_attack(&b, -1, e, TACKLE).legal);
+    CHECK(!d20_command(&b, -1, p, true));
+    CHECK(!d20_deploy(&b, -1, p, 2, 4));
+    CHECK(!d20_walk(&b, b.count, 2, 4));
+    CHECK(!d20_attack(&b, b.count, e, TACKLE).legal);
+    CHECK(d20_start(&b));
+    CHECK(seek(&b, h));
+    CHECK(!d20_walk(&b, -1, 2, 4));
+    CHECK(!d20_attack(&b, -1, e, TACKLE).legal);
+    CHECK(!d20_command(&b, -1, p, true));
+    CHECK(!d20_deploy(&b, -1, p, 2, 4));
+    CHECK(!d20_attack(&b, b.count, e, TACKLE).legal);
+    CHECK(b.units[h].action == 1);
+}
 int main(void)
 {
     test_ability_and_dice();
@@ -252,6 +278,7 @@ int main(void)
     test_two_pokemon_two_resources();
     test_dodge_grants_attack_disadvantage();
     test_uncommanded_dodge_and_invalid_owner();
-    printf("PASS: PokeDnD trainer-initiative D20 core (%d assertions, 11 scenarios)\n", assertions);
+    test_invalid_actor_ids_fail_closed();
+    printf("PASS: PokeDnD trainer-initiative D20 core (%d assertions, 12 scenarios)\n", assertions);
     return 0;
 }
