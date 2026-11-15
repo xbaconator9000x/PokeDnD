@@ -667,6 +667,12 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
         (id == sUnits.human || id == sUnits.pokemon)) {
         MoveSelected(newKeys);
         if (id == sUnits.human) {
+            /* L+START spends the trainer Action to Dash, doubling the
+             * remaining tile budget without resetting already-used steps. */
+            if ((newKeys & (L_BUTTON | START_BUTTON)) == (L_BUTTON | START_BUTTON)) {
+                if (d20_dash(&sBattle, id))
+                    PokeDnD_HudMessage(COMPOUND_STRING("DASH +SPEED TILES"));
+            } else {
             /* A is deployment. Both command types pay the trainer budget. */
             if ((newKeys & A_BUTTON) && !sBattle.units[sUnits.pokemon].deployed)
                 (void)SpawnPikachu();
@@ -684,6 +690,7 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
                 D20Attack result = d20_attack(&sBattle,sUnits.human,sUnits.enemy,TACKLE);
                 PokeDnD_HudAttack(COMPOUND_STRING("HUMAN TACKLE"), result);
                 StartImpact(sUnits.enemy, result);
+            }
             }
         } else {
             D20Attack result = {0};
