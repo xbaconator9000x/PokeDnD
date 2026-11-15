@@ -91,54 +91,37 @@ sample deployed
 key z
 sleep 2; snap 08-after-b-turn
 sample turn
-# The previous test often reached a transitional mostly-black frame.
-# Continue recording instead of misreporting it as either success or failure.
-sleep 15; snap 09-transition-plus-15
-sleep 15; snap 10-transition-plus-30
-for i in $(seq 1 16); do
-  key x
-  sleep 1
-  if [ $((i % 4)) -eq 0 ]; then snap "11-dialogue-advance-$i"; fi
-done
-sleep 5; snap 12-final-field-candidate
-# A second attempt after dialogue advancement is necessary: the initial chord
-# may have been sent while the title/new-game script still owned input.
-# Record each input phase separately so a reviewer can distinguish title,
-# field, encounter activation, deployment, turns and cancellation.
-xdotool keydown --window "$WINDOW" a
-xdotool keydown --window "$WINDOW" s
-key Return
-xdotool keyup --window "$WINDOW" s
-xdotool keyup --window "$WINDOW" a
-sleep 3; snap 13-late-encounter-chord
-key x
-sleep 2; snap 14-deploy-attempt
-key z
-sleep 2; snap 15-end-human-turn
+# Replay a single real encounter: do not spam A/dialogue or retrigger a
+# second fight. Those formerly set the attack bit before its sample and
+# produced a misleading pass with no accountable attack input.
 key s
-sleep 2; snap 16-trainer-bonus-command-attempt
+sleep 2; snap 09-commanded-pikachu
 sample commanded
 key x
-sleep 2; snap 17-commanded-thunderbolt-attempt
+sleep 2; snap 10-pikachu-thunderbolt
 sample attacked
 key z
-sleep 2; snap 17b-return-to-trainer
+sleep 2; snap 11-trainer-reselected
 key z
-sleep 2; snap 17c-end-shared-initiative
+sleep 2; snap 12-shared-turn-ended
 key BackSpace
-sleep 2; snap 18-cancel-attempt
+sleep 2; snap 13-combat-cancelled
 sample cancelled
+# After cancel, real overworld movement must be available again.
+key Right
+sleep 2; snap 14-normal-field-movement
 # Preserve the exact ROM identity and reproducible input sequence alongside frames.
 # A replay of a stale ROM cannot establish acceptance of the current source HEAD.
 sha256sum "$ROM" | awk '{print $1}' > "$OUT/rom-sha256.txt"
 cat > "$OUT/input-sequence.txt" <<'EOF'
 Emulator: mGBA SDL; key mapping: BackSpace=SELECT, a=L, s=R,
 Return=START, x=A, z=B, arrow keys=D-pad.
-Entry attempts: L+R+START at frames 06 and 13.
-Actions: A deployment, B ends trainer turn, R commands via Bonus Action,
-A uses commanded Thunderbolt, B returns to trainer, B ends shared turn,
-SELECT cancellation. Commands on a scripted title screen are not proof.
-No gameplay acceptance is inferred from these inputs.
+One field encounter: L+R+START at frame 06.
+A deploys Pikachu, B advances the shared initiative, R commands via a
+trainer Bonus Action, A attempts Thunderbolt, B reselects trainer, B ends
+the shared turn, SELECT cancels, Right checks ordinary field movement.
+Every action has a distinct real mGBA frame and live EWRAM milestone.
+No gameplay acceptance is inferred from screenshots or inputs alone.
 EOF
 # Require actual live memory observations from the same mGBA process.
 # Expected CSV columns: trigger_count,start_failure,milestones,diagnostic_state.
@@ -197,10 +180,10 @@ for i in range(len(observed) - 6):
             and commanded[3] == 3 and attacked[3] == 3 and cancelled[3] == 4
             and (started[2] & 255) == 1
             and (deployed[2] & 255) == 3
-            and (turned[2] & 135) == 135
-            and (commanded[2] & 32) == 32
-            and (attacked[2] & 96) == 96
-            and (cancelled[2] & 239) == 239):
+            and (turned[2] & 255) == 135
+            and (commanded[2] & 255) == 167
+            and (attacked[2] & 255) == 231
+            and (cancelled[2] & 255) == 239):
         passed = True
         break
 (out / "runtime-probe-verdict.txt").write_text(
