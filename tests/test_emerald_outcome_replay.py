@@ -11,11 +11,18 @@ SPEC.loader.exec_module(outcomes)
 
 
 def sample(label, attempt, bits, state, moves, result, human, enemy, ack):
+    # Native impact samples are reset on encounter entry, then a real
+    # landed hit produces a positive sprite-offset frame count.
+    active_hit = label.startswith(("victory-attack-", "defeat-turn-")) or (
+        label.startswith(("victory-", "defeat-")) and
+        not label.endswith("-start"))
     return dict(label=label, trigger_count=str(attempt), start_failure="0",
                 milestones=str(bits), diagnostic_state=str(state),
                 post_cancel_moves=str(moves), last_outcome=str(result),
                 last_human_hp=str(human), last_enemy_hp=str(enemy),
-                outcome_acks=str(ack))
+                outcome_acks=str(ack),
+                impact_starts=str(1 if active_hit else 0),
+                impact_frames=str(20 if active_hit else 0))
 
 
 def good_trace():
@@ -36,6 +43,19 @@ def good_trace():
 class OutcomeReplayTests(unittest.TestCase):
     def test_real_ordered_victory_and_defeat_accepted(self):
         self.assertTrue(outcomes.validate(good_trace()).startswith("PASS"))
+
+    def test_missing_actual_sprite_animation_rejected(self):
+        rows = good_trace()
+        rows[2]["impact_frames"] = "0"
+        self.assertRaisesRegex(ValueError, "sprite hit reaction", outcomes.validate, rows)
+        rows = good_trace()
+        rows[7]["impact_starts"] = "0"
+        self.assertRaisesRegex(ValueError, "sprite hit reaction", outcomes.validate, rows)
+
+    def test_impact_must_not_precede_attack(self):
+        rows = good_trace()
+        rows[0]["impact_starts"] = "1"
+        self.assertRaisesRegex(ValueError, "before an attack", outcomes.validate, rows)
 
     def test_missing_damage_rejected(self):
         rows = good_trace()
