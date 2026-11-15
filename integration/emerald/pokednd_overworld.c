@@ -28,6 +28,12 @@
 #define D20_ROCKET_LOCAL_ID 231
 #define D20_PIKACHU_LOCAL_ID 232
 #define D20_DEBUG_CHORD (L_BUTTON | R_BUTTON | START_BUTTON)
+/* Explicit optional debug variants: hold UP or DOWN with L+R+START.
+ * These create low-HP *starting positions*, not scripted wins/losses.
+ * Damage, accuracy and battle outcome still run through the D20 engine. */
+#define D20_SCENARIO_STANDARD 0
+#define D20_SCENARIO_VICTORY 1
+#define D20_SCENARIO_DEFEAT 2
 
 /* Exported native probe: 0=idle, 1=started, 2=deployed, 3=turn,
  * 4=cancelled, 5=completed. Never interpret screenshots as this state. */
@@ -48,6 +54,13 @@ EWRAM_DATA volatile u32 gPokeDnDTriggerCount;
  * D20 cancellation AND the player's true map tile subsequently changes.
  * A frame difference or key injection alone must not pass this check. */
 EWRAM_DATA volatile u32 gPokeDnDPostCancelMoves;
+/* Actual result is written only by the core's D20Result transition.
+ * Acknowledgements occur only after a distinct confirmation input. */
+EWRAM_DATA volatile u32 gPokeDnDLastOutcome;
+EWRAM_DATA volatile u32 gPokeDnDLastHumanHp;
+EWRAM_DATA volatile u32 gPokeDnDLastEnemyHp;
+EWRAM_DATA volatile u32 gPokeDnDOutcomeAcks;
+static EWRAM_DATA bool8 sResultShown;
 static EWRAM_DATA bool8 sWatchPostCancelMove;
 static EWRAM_DATA bool8 sSawPostCancelDpad;
 static EWRAM_DATA u8 sPostCancelMapGroup;
@@ -200,7 +213,7 @@ static bool SpawnPikachu(void)
     }
     return false;
 }
-static bool StartCombat(void)
+static bool StartCombat(u8 scenario)
 {
     struct MapPosition player;
     int wx, wy;
@@ -213,6 +226,10 @@ static bool StartCombat(void)
     gPokeDnDDiagnosticState = 0;
     gPokeDnDMilestones = 0;
     gPokeDnDStartFailure = 0;
+    gPokeDnDLastOutcome = FIGHTING;
+    gPokeDnDLastHumanHp = 0;
+    gPokeDnDLastEnemyHp = 0;
+    sResultShown = FALSE;
     if (ArePlayerFieldControlsLocked()) {
         gPokeDnDStartFailure = 1;
         return false;
@@ -261,6 +278,18 @@ static bool StartCombat(void)
     sBattle.units[sUnits.pokemon].stats[CHA] = 18;
     sBattle.units[sUnits.enemy].hp = 16;
     sBattle.units[sUnits.enemy].max_hp = 16;
+    if (scenario == D20_SCENARIO_VICTORY) {
+        /* One real legal attack must still land to win. Natural 1 misses. */
+        sBattle.units[sUnits.enemy].hp = 1;
+        sBattle.units[sUnits.enemy].max_hp = 1;
+        sBattle.units[sUnits.enemy].ac = 2;
+    } else if (scenario == D20_SCENARIO_DEFEAT) {
+        /* Real enemy AI must reach the vulnerable trainer and hit. */
+        sBattle.units[sUnits.human].hp = 1;
+        sBattle.units[sUnits.human].max_hp = 1;
+        sBattle.units[sUnits.human].ac = 2;
+        sBattle.units[sUnits.enemy].stats[STR] = 18;
+    }
     if (!d20_start(&sBattle)) {
         /* The encounter is not active yet: CleanupCombat cannot own this
          * sprite. Roll back the freshly allocated Rocket explicitly. */
@@ -287,6 +316,32 @@ static bool StartCombat(void)
         return false;
     }
     return true;
+}
+static void DisplayBattleResult(void)
+{
+    if (sResultShown || sBattle.outcome == FIGHTING)
+        return;
+    sResultShown = TRUE;
+    /* Neither game-over case is faked by this adapter. */
+    gPokeDnDLastOutcome = sBattle.outcome;
+    gPokeDnDLastHumanHp = sBattle.units[sUnits.human].hp;
+    gPokeDnDLastEnemyHp = sBattle.units[sUnits.enemy].hp;
+    PokeDnD_HudMessage(sBattle.outcome == ALLIES_WIN
+                           ? COMPOUND_STRING("VICTORY - A CONTINUE")
+                           : COMPOUND_STRING("DEFEAT - A CONTINUE"));
+    PokeDnD_HudRedraw(&sBattle);
+}
+static void ArmFieldReturnProbe(void)
+{
+    struct MapPosition position;
+    GetPlayerPosition(&position);
+    sPostCancelX = position.x;
+    sPostCancelY = position.y;
+    sPostCancelMapGroup = gSaveBlock1Ptr->location.mapGroup;
+    sPostCancelMapNum = gSaveBlock1Ptr->location.mapNum;
+    sSawPostCancelDpad = FALSE;
+    sWatchPostCancelMove = TRUE;
+    gPokeDnDPostCancelMoves = 0;
 }
 static void EnemyPhase(void)
 {
@@ -434,8 +489,13 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
             }
         }
         if ((newKeys & START_BUTTON) && (heldKeys & D20_DEBUG_CHORD) == D20_DEBUG_CHORD) {
+            u8 scenario = D20_SCENARIO_STANDARD;
+            if (heldKeys & DPAD_UP)
+                scenario = D20_SCENARIO_VICTORY;
+            else if (heldKeys & DPAD_DOWN)
+                scenario = D20_SCENARIO_DEFEAT;
             gPokeDnDTriggerCount++;
-            return StartCombat();
+            return StartCombat(scenario);
         }
         return FALSE;
     }
@@ -445,28 +505,32 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
         CleanupCombat(FALSE);
         return FALSE;
     }
+    /* A result remains on screen until a separate A/START/B press.
+     * A KO caused by an input on this frame cannot auto-dismiss itself. */
+    if (sResultShown) {
+        if (newKeys & (A_BUTTON | B_BUTTON | START_BUTTON)) {
+            CleanupCombat(TRUE);
+            ArmFieldReturnProbe();
+            gPokeDnDOutcomeAcks++;
+            gPokeDnDDiagnosticState = 5;
+            gPokeDnDMilestones |= 16u;
+        }
+        return TRUE;
+    }
+    if (sBattle.outcome != FIGHTING) {
+        DisplayBattleResult();
+        return TRUE;
+    }
     if (newKeys & SELECT_BUTTON) {
-        struct MapPosition position;
         CleanupCombat(TRUE);
-        /* Arm only after cleanup. The next native field tick, not the D20
-         * cancellation frame, may count a genuine overworld tile step. */
-        GetPlayerPosition(&position);
-        sPostCancelX = position.x;
-        sPostCancelY = position.y;
-        sPostCancelMapGroup = gSaveBlock1Ptr->location.mapGroup;
-        sPostCancelMapNum = gSaveBlock1Ptr->location.mapNum;
-        sSawPostCancelDpad = FALSE;
-        sWatchPostCancelMove = TRUE;
-        gPokeDnDPostCancelMoves = 0;
+        ArmFieldReturnProbe();
         gPokeDnDDiagnosticState = 4;
         gPokeDnDMilestones |= 8u;
         return TRUE;
     }
     RunEnemyPhases();
     if (sBattle.outcome != FIGHTING) {
-        CleanupCombat(FALSE);
-        gPokeDnDDiagnosticState = 5;
-        gPokeDnDMilestones |= 16u;
+        DisplayBattleResult();
         return TRUE;
     }
     id = d20_actor(&sBattle);
@@ -518,14 +582,11 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
             }
         }
     }
-    if (sBattle.outcome != FIGHTING) {
-        CleanupCombat(FALSE);
-        gPokeDnDDiagnosticState = 5;
-        gPokeDnDMilestones |= 16u;
-    }
-    else
+    if (sBattle.outcome == FIGHTING)
         RunEnemyPhases();
-    if (newKeys && sBattle.outcome == FIGHTING)
+    if (sBattle.outcome != FIGHTING)
+        DisplayBattleResult();
+    else if (newKeys)
         PokeDnD_HudRedraw(&sBattle);
     return TRUE; /* Suppress normal field movement and normal Pokémon battles. */
 }
