@@ -22,11 +22,13 @@ NAMES = (
     "gPokeDnDLastHumanHp",
     "gPokeDnDLastEnemyHp",
     "gPokeDnDOutcomeAcks",
+    "gPokeDnDImpactStarts",
+    "gPokeDnDImpactFrames",
 )
 FIELDS = ("label", "trigger_count", "start_failure", "milestones",
           "diagnostic_state", "post_cancel_moves",
           "last_outcome", "last_human_hp", "last_enemy_hp",
-          "outcome_acks")
+          "outcome_acks", "impact_starts", "impact_frames")
 
 
 def symbol_addresses(elf: Path, nm: str = "arm-none-eabi-nm"):
