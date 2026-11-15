@@ -29,6 +29,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_emerald_field_boot.py' -v
           python3 -m unittest discover -s tests -p 'test_emerald_replay_workflow.py' -v
           python3 -m unittest discover -s tests -p 'test_emerald_gdb_probe.py' -v
+          python3 -m unittest discover -s tests -p 'test_emerald_runtime_probe_execution.py' -v
       - name: Fetch exact pinned Emerald source
         run: |
           git init upstream
