@@ -131,18 +131,21 @@ for previous, current in zip(observed, observed[1:]):
         raise SystemExit("FAIL: runtime trigger count regressed")
     if (current[2] & previous[2]) != previous[2]:
         raise SystemExit("FAIL: runtime milestones regressed")
-started = deployed = passed = False
-for trigger, failure, bits in observed:
-    if trigger == 0 or failure != 0:
-        continue
-    if bits & 1:
-        started = True
-    if started and bits & 2:
-        deployed = True
-    if deployed and (bits & 7) == 7:
+# A valid encounter must have a clean pre-trigger baseline, then distinct
+# observations of start, deployment and turn for the same trigger attempt.
+# Reject failure codes at any point during the accepted attempt.
+passed = False
+for i in range(len(observed) - 3):
+    baseline, started, deployed, turned = observed[i:i + 4]
+    attempt = started[0]
+    if (baseline[0] < attempt and baseline[2] & 7 == 0
+            and all(row[0] == attempt and row[1] == 0
+                    for row in (started, deployed, turned))
+            and (started[2] & 7) == 1
+            and (deployed[2] & 7) == 3
+            and (turned[2] & 7) == 7):
         passed = True
-# An all-bits-set initial row is not evidence of observed transitions.
-passed = passed and any((m & 7) == 1 for _, _, m in observed) and any((m & 7) == 3 for _, _, m in observed)
+        break
 (out / "runtime-probe-verdict.txt").write_text(
     ("PASS" if passed else "FAIL") +
     ": observed native trigger, admission, deployment and turn milestones\\n"
