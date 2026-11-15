@@ -64,6 +64,9 @@ EWRAM_DATA volatile u32 gPokeDnDOutcomeAcks;
 /* Native display-only hit reaction evidence; never substitute for damage. */
 EWRAM_DATA volatile u32 gPokeDnDImpactStarts;
 EWRAM_DATA volatile u32 gPokeDnDImpactFrames;
+/* Native evidence: count successful Dash actions and resulting tile budget. */
+EWRAM_DATA volatile u32 gPokeDnDDashCount;
+EWRAM_DATA volatile u32 gPokeDnDLastDashMovement;
 static EWRAM_DATA u8 sImpactObjectId;
 static EWRAM_DATA u8 sImpactSpriteId;
 static EWRAM_DATA u8 sImpactLocalId;
@@ -319,6 +322,8 @@ static bool StartCombat(u8 scenario)
     gPokeDnDLastOutcome = FIGHTING;
     gPokeDnDImpactStarts = 0;
     gPokeDnDImpactFrames = 0;
+    gPokeDnDDashCount = 0;
+    gPokeDnDLastDashMovement = 0;
     sImpactRemaining = 0;
     gPokeDnDLastHumanHp = 0;
     gPokeDnDLastEnemyHp = 0;
@@ -670,8 +675,11 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
             /* L+START spends the trainer Action to Dash, doubling the
              * remaining tile budget without resetting already-used steps. */
             if ((newKeys & START_BUTTON) && (heldKeys & L_BUTTON)) {
-                if (d20_dash(&sBattle, id))
+                if (d20_dash(&sBattle, id)) {
+                    gPokeDnDDashCount++;
+                    gPokeDnDLastDashMovement = sBattle.units[id].movement;
                     PokeDnD_HudMessage(COMPOUND_STRING("DASH +SPEED TILES"));
+                }
             } else {
             /* A is deployment. Both command types pay the trainer budget. */
             if ((newKeys & A_BUTTON) && !sBattle.units[sUnits.pokemon].deployed)
@@ -697,8 +705,11 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
             /* A commanded Pokemon spends its own Action to Dash, not the
              * trainer's already-paid command resource. */
             if ((newKeys & START_BUTTON) && (heldKeys & L_BUTTON)) {
-                if (d20_dash(&sBattle, id))
+                if (d20_dash(&sBattle, id)) {
+                    gPokeDnDDashCount++;
+                    gPokeDnDLastDashMovement = sBattle.units[id].movement;
                     PokeDnD_HudMessage(COMPOUND_STRING("PIKA DASH +SPEED"));
+                }
             } else {
                 if (newKeys & A_BUTTON)
                     result = d20_attack(&sBattle,id,sUnits.enemy,THUNDERBOLT);
