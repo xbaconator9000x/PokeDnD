@@ -110,6 +110,7 @@ sample cancelled
 # After cancel, real overworld movement must be available again.
 key Right
 sleep 2; snap 14-normal-field-movement
+sample resumed
 # Preserve the exact ROM identity and reproducible input sequence alongside frames.
 # A replay of a stale ROM cannot establish acceptance of the current source HEAD.
 sha256sum "$ROM" | awk '{print $1}' > "$OUT/rom-sha256.txt"
@@ -124,7 +125,7 @@ Every action has a distinct real mGBA frame and live EWRAM milestone.
 No gameplay acceptance is inferred from screenshots or inputs alone.
 EOF
 # Require actual live memory observations from the same mGBA process.
-# Expected CSV columns: trigger_count,start_failure,milestones,diagnostic_state.
+# Expected CSV: trigger_count,start_failure,milestones,diagnostic_state,post_cancel_moves.
 # Diagnostic screenshots are NEVER a substitute for this trace.
 # Milestones bit 0=start, bit 1=deploy, bit 2=turn.
 if [ ! -s "$POKEDND_RUNTIME_PROBE" ]; then
@@ -137,24 +138,26 @@ import csv, pathlib, sys
 source, out = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
 with source.open(newline="") as handle:
     rows = list(csv.DictReader(handle))
-required = {"trigger_count", "start_failure", "milestones", "diagnostic_state"}
+required = {"trigger_count", "start_failure", "milestones", "diagnostic_state", "post_cancel_moves"}
 if not rows or not required.issubset(rows[0]):
     raise SystemExit("FAIL: missing runtime probe rows or columns")
 observed = []
 for row in rows:
-    trigger, failure, bits, state = (int(row[k], 0) for k in
-                              ("trigger_count", "start_failure", "milestones", "diagnostic_state"))
-    if min(trigger, failure, bits, state) < 0:
+    trigger, failure, bits, state, moves = (int(row[k], 0) for k in
+        ("trigger_count", "start_failure", "milestones", "diagnostic_state", "post_cancel_moves"))
+    if min(trigger, failure, bits, state, moves) < 0:
         raise SystemExit("FAIL: negative runtime probe value")
-    observed.append((trigger, failure, bits, state))
+    observed.append((trigger, failure, bits, state, moves))
 # A single synthetic or stale all-bits-set row is not a replay trace.
 # Require sequential emulator observations of activation, deployment and turn.
 # Trigger counts must never decrease and milestone bits must be monotonic.
-if len(observed) < 7:
-    raise SystemExit("FAIL: require baseline, start, deploy, turn, command, attack and cancel samples")
+if len(observed) < 8:
+    raise SystemExit("FAIL: require baseline, combat actions, cancellation and field-step samples")
 if observed[0][1] != 0:
     raise SystemExit("FAIL: runtime admission failure observed")
 for previous, current in zip(observed, observed[1:]):
+    if current[4] < previous[4]:
+        raise SystemExit("FAIL: native post-cancel movement counter regressed")
     if current[0] < previous[0]:
         raise SystemExit("FAIL: runtime trigger count regressed")
     if current[0] > previous[0] + 1:
@@ -169,26 +172,31 @@ for previous, current in zip(observed, observed[1:]):
 # observations of start, deployment and turn for the same trigger attempt.
 # Reject failure codes at any point during the accepted attempt.
 passed = False
-for i in range(len(observed) - 6):
-    baseline, started, deployed, turned, commanded, attacked, cancelled = observed[i:i + 7]
+for i in range(len(observed) - 7):
+    baseline, started, deployed, turned, commanded, attacked, cancelled, resumed = observed[i:i + 8]
     attempt = started[0]
     if (baseline[0] + 1 == attempt and baseline[1] == 0
             and baseline[2] == 0 and baseline[3] == 0
             and all(row[0] == attempt and row[1] == 0
-                    for row in (started, deployed, turned, commanded, attacked, cancelled))
+                    for row in (started, deployed, turned, commanded, attacked, cancelled, resumed))
             and started[3] == 1 and deployed[3] == 2 and turned[3] == 3
-            and commanded[3] == 3 and attacked[3] == 3 and cancelled[3] == 4
+            and commanded[3] == 3 and attacked[3] == 3
+            and cancelled[3] == 4 and resumed[3] == 4
+            and all(row[4] == 0 for row in (baseline, started, deployed,
+                    turned, commanded, attacked, cancelled))
+            and resumed[4] == 1
             and (started[2] & 255) == 1
             and (deployed[2] & 255) == 3
             and (turned[2] & 255) == 135
             and (commanded[2] & 255) == 167
             and (attacked[2] & 255) == 231
-            and (cancelled[2] & 255) == 239):
+            and (cancelled[2] & 255) == 239
+            and (resumed[2] & 255) == 239):
         passed = True
         break
 (out / "runtime-probe-verdict.txt").write_text(
     ("PASS" if passed else "FAIL") +
-    ": live mGBA EWRAM proves encounter, deployment, turn, Dodge, command, attack and cancellation\n"
+    ": live mGBA EWRAM proves encounter, deployment, turn, command, attack, cancellation and native overworld step\n"
 )
 if not passed:
     raise SystemExit("FAIL: runtime probe does not establish tactical gameplay")
@@ -200,13 +208,13 @@ if [ -n "${POKEDND_ELF:-}" ]; then
   test -f "$POKEDND_ELF" || { echo "Missing POKEDND_ELF" >&2; exit 1; }
   NM="${POKEDND_NM:-arm-none-eabi-nm}"
   "$NM" -n "$POKEDND_ELF" > "$OUT/linked-symbols.txt"
-  for symbol in gPokeDnDTriggerCount gPokeDnDStartFailure gPokeDnDDiagnosticState gPokeDnDMilestones; do
+  for symbol in gPokeDnDTriggerCount gPokeDnDStartFailure gPokeDnDDiagnosticState gPokeDnDMilestones gPokeDnDPostCancelMoves; do
     if ! awk -v s="$symbol" '$3 == s {found=1} END {exit !found}' "$OUT/linked-symbols.txt"; then
       echo "Missing linked combat probe symbol: $symbol" >&2
       exit 1
     fi
   done
-  awk '$3 ~ /^gPokeDnD(TriggerCount|StartFailure|DiagnosticState|Milestones)$/ {print}' \
+  awk '$3 ~ /^gPokeDnD(TriggerCount|StartFailure|DiagnosticState|Milestones|PostCancelMoves)$/ {print}' \
     "$OUT/linked-symbols.txt" > "$OUT/probe-addresses.txt"
 fi
 # Diagnostic screenshots are not acceptance evidence. Record image changes
@@ -227,8 +235,9 @@ A green workflow means the emulator and capture harness ran successfully.
 First read gPokeDnDTriggerCount: zero means the field hook never saw the chord.
 If positive, read gPokeDnDStartFailure to diagnose admission rejection.
 Before accepting combat, read native gPokeDnDDiagnosticState from emulated
-EWRAM and verify ordered transitions: 1 encounter, 2 deployment, 3 turn,
-4 cancellation (or 5 completion). Do not infer these from filenames or PNGs.
+EWRAM and verify ordered transitions: encounter, deployment, turn,
+command, attack, cancellation, and a new normal-field D-pad step observed
+from actual native player tile coordinates. Do not infer from filenames.
 EOF
 # Produce a compact, chronological animation exclusively from genuine emulator
 # window captures. This is diagnostic evidence, NOT proof of a playable battle.
