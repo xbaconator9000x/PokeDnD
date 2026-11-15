@@ -25,8 +25,8 @@ def run_trace(rows):
     with tempfile.TemporaryDirectory() as temp:
         folder = pathlib.Path(temp)
         csv = folder / "trace.csv"
-        csv.write_text("trigger_count,start_failure,milestones\n" + "".join(
-            f"{t},{f},{m}\n" for t, f, m in rows))
+        csv.write_text("trigger_count,start_failure,milestones,diagnostic_state\n" + "".join(
+            ",".join(str(value) for value in row) + "\n" for row in rows))
         result = subprocess.run(
             [sys.executable, "-c", validator_source(), str(csv), str(folder)],
             capture_output=True, text=True, check=False)
@@ -36,9 +36,17 @@ def run_trace(rows):
 
 class RuntimeProbeExecutionTests(unittest.TestCase):
     def test_real_ordered_trace_passes(self):
-        status, verdict = run_trace([(0, 0, 0), (1, 0, 1), (1, 0, 3), (1, 0, 7)])
+        status, verdict = run_trace([(0, 0, 0, 0), (1, 0, 1, 1), (1, 0, 3, 2), (1, 0, 7, 3)])
         self.assertEqual(status, 0)
         self.assertTrue(verdict.startswith("PASS"))
+
+    def test_wrong_native_state_rejected(self):
+        self.assertNotEqual(run_trace([(0, 0, 0, 0), (1, 0, 1, 1),
+                                       (1, 0, 3, 1), (1, 0, 7, 3)])[0], 0)
+
+    def test_skipped_trigger_attempt_rejected(self):
+        self.assertNotEqual(run_trace([(0, 0, 0, 0), (2, 0, 1, 1),
+                                       (2, 0, 3, 2), (2, 0, 7, 3)])[0], 0)
 
     def test_no_baseline_rejected(self):
         self.assertNotEqual(run_trace([(1, 0, 1), (1, 0, 3), (1, 0, 7)])[0], 0)
