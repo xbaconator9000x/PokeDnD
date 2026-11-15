@@ -590,7 +590,9 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
             else if (heldKeys & DPAD_DOWN)
                 scenario = D20_SCENARIO_DEFEAT;
             gPokeDnDTriggerCount++;
-            return StartCombat(scenario);
+            /* A rejected debug encounter must not leak START to Emerald.\n             * Otherwise the same chord unexpectedly opens the field menu,\n             * obscuring the native admission error and consuming input. */
+            (void)StartCombat(scenario);
+            return TRUE;
         }
         return FALSE;
     }
