@@ -6,6 +6,7 @@ import importlib.util
 from pathlib import Path
 import socket
 import threading
+import time
 import unittest
 from unittest import mock
 
@@ -71,6 +72,16 @@ class FakeGDB:
         except OSError:
             return
 
+    def wait_for_continue(self):
+        # The mock debugger runs on another thread: a sent packet is not
+        # necessarily processed before snapshot() returns.
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            if self.commands.count("c") >= 2:
+                return
+            time.sleep(0.005)
+        raise AssertionError("mock GDB never resumed after snapshot")
+
     def close(self):
         self.sock.close()
         self.thread.join(timeout=2)
@@ -106,6 +117,7 @@ class GDBProbeTests(unittest.TestCase):
             gdb = probe.RemoteGDB(a)
             gdb.start()
             observed = gdb.snapshot(addresses)
+            fake.wait_for_continue()
             self.assertEqual(tuple(observed[key] for key in probe.NAMES), expected)
             self.assertEqual(fake.commands[0:2], ["?", "c"])
             self.assertEqual(fake.commands[-1], "c")
@@ -124,6 +136,7 @@ class GDBProbeTests(unittest.TestCase):
             gdb.start()
             with self.assertRaisesRegex(ValueError, "four-byte EWRAM"):
                 gdb.snapshot(dict.fromkeys(probe.NAMES, 0x100))
+            fake.wait_for_continue()
             self.assertEqual(fake.commands[-1], "c")
         finally:
             a.close()
