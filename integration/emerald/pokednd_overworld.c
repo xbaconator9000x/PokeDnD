@@ -14,6 +14,7 @@
 #include "global.h"
 #include "d20.h"
 #include "d20_field.h"
+#include "pokednd_hud.h"
 #include "event_object_movement.h"
 #include "field_control_avatar.h"
 #include "field_player_avatar.h"
@@ -94,6 +95,12 @@ static void FreezeSurroundingActors(void)
 }
 static void CleanupCombat(bool8 restorePlayer)
 {
+    /* Combat may end after a warp has reset the BG0 window heap. */
+    if (sMapGroup == gSaveBlock1Ptr->location.mapGroup &&
+        sMapNum == gSaveBlock1Ptr->location.mapNum)
+        PokeDnD_HudClose();
+    else
+        PokeDnD_HudAbandon();
     /* Never unfreeze a pre-existing scripted actor, or an NPC slot reused
      * after a map warp. Only revert the freezes we personally installed. */
     if (sActive && sMapGroup == gSaveBlock1Ptr->location.mapGroup &&
@@ -178,6 +185,7 @@ static bool SpawnPikachu(void)
         sPikachuObjectId = spriteId;
         gPokeDnDDiagnosticState = 2;
         gPokeDnDMilestones |= 2u;
+        PokeDnD_HudMessage(COMPOUND_STRING("PIKACHU DEPLOYED"));
         return true;
     }
     return false;
@@ -257,6 +265,14 @@ static bool StartCombat(void)
     gPokeDnDDiagnosticState = 1;
     gPokeDnDMilestones |= 1u;
     FreezeSurroundingActors();
+    if (!PokeDnD_HudOpen(&sBattle, sUnits.human, sUnits.pokemon,
+                        sUnits.enemy)) {
+        CleanupCombat(FALSE);
+        gPokeDnDDiagnosticState = 0;
+        gPokeDnDMilestones = 0;
+        gPokeDnDStartFailure = 8; /* BG0 HUD allocation unavailable. */
+        return false;
+    }
     return true;
 }
 static void EnemyPhase(void)
@@ -342,19 +358,29 @@ static void EnemyPhase(void)
             }
         }
         if (best >= 0 && d20_walk(&sBattle, sUnits.enemy,
-                                  enemy->x + stepX[best], enemy->y + stepY[best]))
+                                  enemy->x + stepX[best], enemy->y + stepY[best])) {
             MoveVisual(sUnits.enemy);
+            PokeDnD_HudMessage(COMPOUND_STRING("ROCKET ADVANCES"));
+        }
     }
-    if (DistanceTo(sUnits.enemy,target) == 1)
-        (void)d20_attack(&sBattle,sUnits.enemy,target,TACKLE);
+    if (DistanceTo(sUnits.enemy,target) == 1) {
+        D20Attack result = d20_attack(&sBattle,sUnits.enemy,target,TACKLE);
+        if (result.legal)
+            PokeDnD_HudAttack(COMPOUND_STRING("ROCKET TACKLE"), result);
+    }
     if (sBattle.outcome == FIGHTING)
         (void)d20_next(&sBattle);
 }
 static void RunEnemyPhases(void)
 {
+    bool8 tookTurn = FALSE;
     for (int i = 0; i < 6 && sBattle.outcome == FIGHTING &&
-                        d20_current(&sBattle) == sUnits.enemy; i++)
+                        d20_current(&sBattle) == sUnits.enemy; i++) {
+        tookTurn = TRUE;
         EnemyPhase();
+    }
+    if (tookTurn)
+        PokeDnD_HudRedraw(&sBattle);
 }
 static void MoveSelected(u16 newKeys)
 {
@@ -409,28 +435,40 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
             if ((newKeys & A_BUTTON) && !sBattle.units[sUnits.pokemon].deployed)
                 (void)SpawnPikachu();
             if ((newKeys & L_BUTTON) &&
-                d20_command(&sBattle,sUnits.human,sUnits.pokemon,false))
+                d20_command(&sBattle,sUnits.human,sUnits.pokemon,false)) {
                 gPokeDnDMilestones |= 32u;
+                PokeDnD_HudMessage(COMPOUND_STRING("PIKA ACTION COMMAND"));
+            }
             if ((newKeys & R_BUTTON) &&
-                d20_command(&sBattle,sUnits.human,sUnits.pokemon,true))
+                d20_command(&sBattle,sUnits.human,sUnits.pokemon,true)) {
                 gPokeDnDMilestones |= 32u;
-            if (newKeys & START_BUTTON)
-                (void)d20_attack(&sBattle,sUnits.human,sUnits.enemy,TACKLE);
+                PokeDnD_HudMessage(COMPOUND_STRING("PIKA BONUS COMMAND"));
+            }
+            if (newKeys & START_BUTTON) {
+                D20Attack result = d20_attack(&sBattle,sUnits.human,sUnits.enemy,TACKLE);
+                PokeDnD_HudAttack(COMPOUND_STRING("HUMAN TACKLE"), result);
+            }
         } else {
             D20Attack result = {0};
             if (newKeys & A_BUTTON)
                 result = d20_attack(&sBattle,id,sUnits.enemy,THUNDERBOLT);
             else if (newKeys & R_BUTTON)
                 result = d20_attack(&sBattle,id,sUnits.enemy,QUICK_ATTACK);
+            if (newKeys & (A_BUTTON | R_BUTTON))
+                PokeDnD_HudAttack((newKeys & A_BUTTON)
+                                    ? COMPOUND_STRING("PIKA THUNDERBOLT")
+                                    : COMPOUND_STRING("PIKA QUICK ATTACK"), result);
             if (result.legal)
                 gPokeDnDMilestones |= 64u;
         }
         if ((newKeys & B_BUTTON) && sBattle.outcome == FIGHTING) {
             if (id == sUnits.pokemon) {
-                (void)d20_select(&sBattle,sUnits.human);
+                if (d20_select(&sBattle,sUnits.human))
+                    PokeDnD_HudMessage(COMPOUND_STRING("HUMAN SELECTED"));
             } else if (d20_next(&sBattle)) {
                 gPokeDnDDiagnosticState = 3;
                 gPokeDnDMilestones |= 4u;
+                PokeDnD_HudMessage(COMPOUND_STRING("INITIATIVE ADVANCES"));
                 if (sBattle.units[sUnits.pokemon].deployed &&
                     sBattle.units[sUnits.pokemon].dodging)
                     gPokeDnDMilestones |= 128u;
@@ -444,5 +482,7 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
     }
     else
         RunEnemyPhases();
+    if (newKeys && sBattle.outcome == FIGHTING)
+        PokeDnD_HudRedraw(&sBattle);
     return TRUE; /* Suppress normal field movement and normal Pokémon battles. */
 }
