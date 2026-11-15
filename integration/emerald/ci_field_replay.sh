@@ -279,25 +279,25 @@ for previous, current in zip(observed, observed[1:]):
 # observations of start, deployment and turn for the same trigger attempt.
 # Reject failure codes at any point during the accepted attempt.
 passed = False
-for i in range(len(observed) - 7):
-    baseline, started, deployed, turned, commanded, attacked, cancelled, resumed = observed[i:i + 8]
+for i in range(len(observed) - 8):
+    baseline, started, deployed, turned, commanded, attacked, dashed, cancelled, resumed = observed[i:i + 9]
     attempt = started[0]
     if (baseline[0] + 1 == attempt and baseline[1] == 0
             and baseline[2] == 0 and baseline[3] == 0
             and all(row[0] == attempt and row[1] == 0
-                    for row in (started, deployed, turned, commanded, attacked, cancelled, resumed))
+                    for row in (started, deployed, turned, commanded, attacked, dashed, cancelled, resumed))
             and started[3] == 1 and deployed[3] == 2 and turned[3] == 3
             and commanded[3] == 3 and attacked[3] == 3
-            and cancelled[3] == 4 and resumed[3] == 4
+            and dashed[3] == 3 and cancelled[3] == 4 and resumed[3] == 4
             and all(row[4] == 0 for row in (baseline, started, deployed,
-                    turned, commanded, attacked, cancelled))
+                    turned, commanded, attacked, dashed, cancelled))
             and resumed[4] == 1
             and (started[2] & 255) == 1
             and (deployed[2] & 255) == 3
             and (turned[2] & 255) == 135
             and (commanded[2] & 255) == 167
             and (attacked[2] & 255) == 231
-            and (cancelled[2] & 255) == 239
+            and (dashed[2] & 255) == 231\n            and (cancelled[2] & 255) == 239
             and (resumed[2] & 255) == 239):
         passed = True
         break
