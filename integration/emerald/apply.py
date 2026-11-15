@@ -41,6 +41,8 @@ def install(upstream: Path, *, check_only: bool = False, field_replay: bool = Fa
         upstream / "include/d20.h": SOURCE / "include/d20.h",
         upstream / "include/d20_field.h": SOURCE / "include/d20_field.h",
         upstream / "include/pokednd_overworld.h": SOURCE / "integration/emerald/pokednd_overworld.h",
+        upstream / "include/pokednd_hud.h": SOURCE / "integration/emerald/pokednd_hud.h",
+        upstream / "src/pokednd_hud.c": SOURCE / "integration/emerald/pokednd_hud.c",
         upstream / "src/d20.c": SOURCE / "src/d20.c",
         upstream / "src/d20_field.c": SOURCE / "src/d20_field.c",
         upstream / "src/pokednd_overworld.c": SOURCE / "integration/emerald/pokednd_overworld.c",
