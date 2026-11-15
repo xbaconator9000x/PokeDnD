@@ -15,7 +15,7 @@ static bool free_tile(const D20Battle *b, int x, int y, int except)
 void d20_init(D20Battle *b, uint32_t seed)
 {
     memset(b, 0, sizeof(*b));
-    b->cursor = -1; b->rng = seed ? seed : 0xC0FFEEu;
+    b->cursor = -1; b->selected = -1; b->rng = seed ? seed : 0xC0FFEEu;
     for (int y = 0; y < D20_H; y++) for (int x = 0; x < D20_W; x++) b->map[y][x] = '.';
 }
 int d20_mod(int s) { return s >= 10 ? (s - 10) / 2 : -((11 - s) / 2); }
@@ -75,7 +75,7 @@ bool d20_start(D20Battle *b)
     }
     if (!allies || !foes) return false;
     b->round = 1; b->cursor = -1; b->started = 1;
-    for (int i = 0; i < b->count; i++) if (b->units[i].deployed && b->units[i].hp > 0) {
+    for (int i = 0; i < b->count; i++) if (b->units[i].deployed && b->units[i].hp > 0 && b->units[i].role != POKEMON) {
         D20Unit *u = &b->units[i];
         u->initiative = (int16_t)(d20_roll(b, 20) + d20_mod(u->stats[DEX]));
         insert_turn(b, i);
@@ -87,6 +87,41 @@ int d20_current(const D20Battle *b)
     if (!b || !b->started || b->outcome != FIGHTING || b->cursor < 0 ||
         b->cursor >= b->order_count) return -1;
     return b->order[b->cursor];
+}
+int d20_actor(const D20Battle *b)
+{
+    if (d20_current(b) < 0) return -1;
+    return b->selected;
+}
+bool d20_select(D20Battle *b, int actor)
+{
+    int owner = d20_current(b);
+    if (owner < 0 || actor < 0 || actor >= b->count) return false;
+    if (actor == owner) { b->selected = (int8_t)owner; return true; }
+    D20Unit *p = &b->units[actor];
+    if (b->units[owner].role != HUMAN || p->role != POKEMON ||
+        p->owner != owner || !p->deployed || p->hp <= 0 ||
+        p->ready_round > b->round || !p->commanded) return false;
+    b->selected = (int8_t)actor;
+    return true;
+}
+bool d20_command(D20Battle *b, int owner, int pokemon, bool spendBonus)
+{
+    D20Unit *h, *p;
+    if (!b || d20_current(b) != owner || pokemon < 0 || pokemon >= b->count) return false;
+    h = &b->units[owner]; p = &b->units[pokemon];
+    if (h->role != HUMAN || h->hp <= 0 || p->role != POKEMON ||
+        p->owner != owner || !p->deployed || p->hp <= 0 ||
+        p->ready_round > b->round || p->commanded ||
+        (spendBonus ? !h->bonus : !h->action)) return false;
+    if (spendBonus) h->bonus = 0; else h->action = 0;
+    p->commanded = 1;
+    p->dodging = 0;
+    p->action = p->asleep ? 0 : 1;
+    p->movement = p->asleep ? 0 : p->speed;
+    p->asleep = 0;
+    b->selected = (int8_t)pokemon;
+    return true;
 }
 bool d20_next(D20Battle *b)
 {
@@ -102,6 +137,18 @@ bool d20_next(D20Battle *b)
         u->reaction = u->asleep ? 0 : 1;
         u->movement = u->asleep ? 0 : u->speed;
         u->asleep = 0; /* One missed turn: prototype, not full 2024 condition. */
+        b->selected = b->order[b->cursor];
+        if (u->role == HUMAN) {
+            for (int i = 0; i < b->count; i++) {
+                D20Unit *p = &b->units[i];
+                if (p->role != POKEMON || p->owner != b->selected ||
+                    !p->deployed || p->hp <= 0) continue;
+                p->commanded = 0;
+                p->action = 0;
+                p->movement = 0;
+                p->dodging = 1; /* Default Dodge until a valid command. */
+            }
+        }
         return true;
     }
     return false;
@@ -109,15 +156,16 @@ bool d20_next(D20Battle *b)
 bool d20_deploy(D20Battle *b, int owner, int pokemon, int x, int y)
 {
     D20Unit *h, *p;
-    if (!b || d20_current(b) != owner || pokemon < 0 || pokemon >= b->count) return false;
+    if (!b || d20_current(b) != owner || d20_actor(b) != owner ||
+        pokemon < 0 || pokemon >= b->count) return false;
     h = &b->units[owner]; p = &b->units[pokemon];
-    if (h->role != HUMAN || !h->action || p->role != POKEMON || p->owner != owner ||
+    if (h->role != HUMAN || h->hp <= 0 || !h->action || p->role != POKEMON || p->owner != owner ||
         p->deployed || p->hp <= 0 || ab(x-h->x) + ab(y-h->y) != 1 ||
         !free_tile(b, x, y, -1)) return false;
     h->action = 0; p->deployed = 1; p->x = (int8_t)x; p->y = (int8_t)y;
-    p->ready_round = b->round + 1; /* Homebrew: no free immediate action. */
-    p->initiative = (int16_t)(d20_roll(b, 20) + d20_mod(p->stats[DEX]));
-    insert_turn(b, pokemon);
+    p->ready_round = b->round + 1; /* No immediate attack after deployment. */
+    p->initiative = h->initiative; /* Share the trainer initiative, no slot. */
+    p->commanded = 0; p->dodging = 1;
     return true;
 }
 bool d20_walk(D20Battle *b, int actor, int x, int y)
@@ -125,7 +173,7 @@ bool d20_walk(D20Battle *b, int actor, int x, int y)
     int distances[D20_W * D20_H], queue[D20_W * D20_H], head = 0, tail = 0, goal;
     const int dx[] = {1, -1, 0, 0}, dy[] = {0, 0, 1, -1};
     D20Unit *u;
-    if (!b || d20_current(b) != actor || !inside(x, y)) return false;
+    if (!b || d20_actor(b) != actor || !inside(x, y)) return false;
     u = &b->units[actor];
     if (!u->movement || !free_tile(b, x, y, actor) || (u->x == x && u->y == y)) return false;
     for (int i = 0; i < D20_W * D20_H; i++) distances[i] = -1;
@@ -172,25 +220,32 @@ static void resolve_victory(D20Battle *b)
 {
     bool allies = false, foes = false;
     for (int i = 0; i < b->count; i++) if (b->units[i].deployed && b->units[i].hp > 0) {
-        if (b->units[i].team) foes = true; else allies = true;
+        if (b->units[i].team) foes = true;
+        else if (b->units[i].role == HUMAN) allies = true;
     }
     if (!foes) b->outcome = ALLIES_WIN;
     else if (!allies) b->outcome = ENEMIES_WIN;
 }
 D20Attack d20_attack(D20Battle *b, int actor, int target, D20Move move)
 {
-    D20Attack result = {0, 0, 0, 0, 0, 0};
+    D20Attack result = {0, 0, 0, 0, 0, 0, 0};
     D20Unit *a, *t;
     int range, roll, damage = 0, dice, sides;
     D20Stat stat;
-    if (!b || d20_current(b) != actor || target < 0 || target >= b->count ||
+    if (!b || d20_actor(b) != actor || target < 0 || target >= b->count ||
         move > SLEEP_POWDER) return result;
     a = &b->units[actor]; t = &b->units[target];
     if (!a->action || a->hp <= 0 || !t->deployed || t->hp <= 0 || a->team == t->team) return result;
     range = move == THUNDERBOLT ? 5 : move == SLEEP_POWDER ? 4 : 1;
     if (ab(a->x-t->x) + ab(a->y-t->y) > range || !d20_los(b, a->x, a->y, t->x, t->y)) return result;
     a->action = 0; result.legal = true;
-    roll = d20_roll(b, 20); result.natural = roll;
+    roll = d20_roll(b, 20);
+    /* Dodge imposes disadvantage on attacks, not on CON saving throws. */
+    if (move != SLEEP_POWDER && t->dodging) {
+        result.second_roll = d20_roll(b, 20);
+        if (result.second_roll < roll) roll = result.second_roll;
+    }
+    result.natural = roll;
     if (move == SLEEP_POWDER) {
         int dc = 8 + a->proficiency + d20_mod(a->stats[WIS]);
         result.total = roll + d20_mod(t->stats[CON]);
