@@ -60,6 +60,13 @@ class ReplayWorkflowTests(unittest.TestCase):
         self.assertNotIn("ACCEPTANCE_NOT_VERIFIED.txt", script)
         self.assertIn("do NOT establish natural NPC/wild encounter activation", script)
 
+    def test_rejected_debug_chord_is_consumed(self):
+        source = (ROOT / "integration/emerald/pokednd_overworld.c").read_text()
+        self.assertIn("(void)StartCombat(scenario);", source)
+        self.assertIn("gPokeDnDTriggerCount++;", source)
+        self.assertNotIn("return StartCombat(scenario);", source)
+        self.assertIn("return TRUE;", source.split("(void)StartCombat(scenario);", 1)[1].split("return FALSE;", 1)[0])
+
     def test_upstream_pin_matches_native_build(self):
         self.assertIn(PIN, INTEGRATION.read_text())
 
