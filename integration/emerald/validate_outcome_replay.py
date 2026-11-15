@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+"""Fail-closed native Emerald victory/defeat acceptance for a live GDB CSV.
+
+This is only authoritative when the input CSV comes from the replay's real
+mGBA debugger socket. Synthetic rows are used only for validator unit tests.
+"""
+import argparse
+import csv
+from pathlib import Path
+
+
+REQUIRED = (
+    "label", "trigger_count", "start_failure", "milestones",
+    "diagnostic_state", "post_cancel_moves", "last_outcome",
+    "last_human_hp", "last_enemy_hp", "outcome_acks",
+)
+
+
+def validate(rows):
+    if not rows:
+        raise ValueError("no live EWRAM samples")
+    if set(REQUIRED) - set(rows[0]):
+        raise ValueError("missing native outcome or HP registers")
+    parsed = []
+    for row in rows:
+        sample = {"label": row["label"]}
+        for column in REQUIRED[1:]:
+            sample[column] = int(row[column], 0)
+            if sample[column] < 0:
+                raise ValueError("negative EWRAM value")
+        parsed.append(sample)
+
+    def checkpoint(name):
+        found = [r for r in parsed if r["label"] == name]
+        if len(found) != 1:
+            raise ValueError("expected exactly one checkpoint: " + name)
+        return found[0]
+
+    vstart = checkpoint("victory-start")
+    vresult = checkpoint("victory-result")
+    vconfirm = checkpoint("victory-confirmed")
+    vresume = checkpoint("victory-resumed")
+    dstart = checkpoint("defeat-start")
+    dresult = checkpoint("defeat-result")
+    dconfirm = checkpoint("defeat-confirmed")
+    dresume = checkpoint("defeat-resumed")
+    labels = [r["label"] for r in parsed]
+    sequence = ["victory-start", "victory-result", "victory-confirmed",
+                "victory-resumed", "defeat-start", "defeat-result",
+                "defeat-confirmed", "defeat-resumed"]
+    if [labels.index(n) for n in sequence] != sorted(labels.index(n) for n in sequence):
+        raise ValueError("native outcome events out of order")
+    if not any(r["label"].startswith("victory-attack-") and
+               labels.index("victory-start") < i < labels.index("victory-result")
+               for i, r in enumerate(parsed)):
+        raise ValueError("victory lacks actual input/attack checkpoint")
+    if not any(r["label"].startswith("defeat-turn-") and
+               labels.index("defeat-start") < i < labels.index("defeat-result")
+               for i, r in enumerate(parsed)):
+        raise ValueError("defeat lacks genuine enemy turn checkpoint")
+
+    for name, start, result, confirm, resume, attempt, outcome, acks in (
+        ("victory", vstart, vresult, vconfirm, vresume, 2, 1, 0),
+        ("defeat", dstart, dresult, dconfirm, dresume, 3, 2, 1),
+    ):
+        if any(row["start_failure"] for row in (start, result, confirm, resume)):
+            raise ValueError(name + " has native admission failure")
+        if any(row["trigger_count"] != attempt for row in (start, result, confirm, resume)):
+            raise ValueError(name + " has wrong native encounter count")
+        if start["last_outcome"] != 0 or start["diagnostic_state"] != 1:
+            raise ValueError(name + " did not start a new live fight")
+        if start["outcome_acks"] != acks:
+            raise ValueError(name + " inherited unexpected result acknowledgement")
+        if result["last_outcome"] != outcome or result["outcome_acks"] != acks:
+            raise ValueError(name + " lacks unacknowledged native result")
+        if result["diagnostic_state"] not in (1, 2, 3):
+            raise ValueError(name + " result screen was already dismissed")
+        if confirm["last_outcome"] != outcome or confirm["diagnostic_state"] != 5:
+            raise ValueError(name + " did not complete native battle cleanup")
+        if confirm["outcome_acks"] != acks + 1 or not confirm["milestones"] & 16:
+            raise ValueError(name + " lacks separate confirmed outcome")
+        if any(row["post_cancel_moves"] != 0 for row in (start, result, confirm)):
+            raise ValueError(name + " counted a premature field step")
+        if resume["last_outcome"] != outcome or resume["diagnostic_state"] != 5:
+            raise ValueError(name + " lost result after resuming")
+        if resume["outcome_acks"] != acks + 1 or resume["post_cancel_moves"] != 1:
+            raise ValueError(name + " did not resume with a real map-tile step")
+
+    if vresult["last_enemy_hp"] != 0 or vresult["last_human_hp"] < 1:
+        raise ValueError("victory did not defeat Rocket while human survived")
+    if dresult["last_human_hp"] != 0 or dresult["last_enemy_hp"] < 1:
+        raise ValueError("defeat did not KO human while Rocket survived")
+    if not vresult["milestones"] & 64:
+        raise ValueError("victory did not include a legal Pokémon attack")
+    if not dresult["milestones"] & 4:
+        raise ValueError("defeat did not progress real initiative")
+    return "PASS: mGBA D20 win/loss + real HP damage + confirmed cleanup + both normal field steps"
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("trace", type=Path)
+    parser.add_argument("evidence", type=Path)
+    args = parser.parse_args()
+    with args.trace.open(newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    try:
+        verdict = validate(rows)
+    except (ValueError, KeyError) as error:
+        verdict = "FAIL: " + str(error)
+        args.evidence.joinpath("outcome-verdict.txt").write_text(verdict + "\n")
+        raise SystemExit(verdict)
+    args.evidence.joinpath("outcome-verdict.txt").write_text(verdict + "\n")
+    print(verdict)
+
+
+if __name__ == "__main__":
+    main()
