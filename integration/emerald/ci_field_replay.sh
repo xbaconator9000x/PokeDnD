@@ -35,9 +35,16 @@ sleep 14; snap 02b-title-cinematic
 # The rider cinematic still runs at ~36 s; the press-start title appears
 # only after roughly 45 s. Wait until the SELECT New Game HUD is shown.
 sleep 16; snap 02c-title-ready
-# pokeemerald-expansion quickstart: SELECT on interactive title skips naming.
-key BackSpace
-sleep 8; snap 03-after-title-select
+# The quickstart hook only handles SELECT in Task_TitleScreenPhase3.
+# A single press can land during a cinematic/title task transition. Retry
+# across a bounded window, retaining distinct frames for visual diagnosis.
+# Do not press A/START here: that would enter the ordinary new-game intro.
+for attempt in 1 2 3 4; do
+  key BackSpace
+  sleep 3
+  snap "03-title-select-attempt-$attempt"
+done
+sleep 2; snap 03-after-title-select
 sleep 10; snap 04-world-candidate
 # Discover where the native flow reaches after quickstart. Capture evidence.
 for k in Left Left Down Down Right Down; do
@@ -158,7 +165,7 @@ for i in range(len(observed) - 3):
         break
 (out / "runtime-probe-verdict.txt").write_text(
     ("PASS" if passed else "FAIL") +
-    ": observed native trigger, admission, deployment and turn milestones plus native states\\n"
+    ": observed native trigger, admission, deployment and turn milestones plus native states\n"
 )
 if not passed:
     raise SystemExit("FAIL: runtime probe does not establish tactical gameplay")
