@@ -36,9 +36,20 @@ def run_trace(rows):
 
 class RuntimeProbeExecutionTests(unittest.TestCase):
     def test_real_ordered_trace_passes(self):
-        status, verdict = run_trace([(1, 0, 1), (1, 0, 3), (1, 0, 7)])
+        status, verdict = run_trace([(0, 0, 0), (1, 0, 1), (1, 0, 3), (1, 0, 7)])
         self.assertEqual(status, 0)
         self.assertTrue(verdict.startswith("PASS"))
+
+    def test_no_baseline_rejected(self):
+        self.assertNotEqual(run_trace([(1, 0, 1), (1, 0, 3), (1, 0, 7)])[0], 0)
+
+    def test_cross_attempt_milestones_rejected(self):
+        self.assertNotEqual(run_trace([(0, 0, 0), (1, 0, 1),
+                                       (2, 0, 3), (2, 0, 7)])[0], 0)
+
+    def test_failed_attempt_rejected(self):
+        self.assertNotEqual(run_trace([(0, 0, 0), (1, 0, 1),
+                                       (1, 2, 3), (1, 0, 7)])[0], 0)
 
     def test_single_snapshot_rejected(self):
         self.assertNotEqual(run_trace([(1, 0, 7)])[0], 0)
