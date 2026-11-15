@@ -79,10 +79,14 @@ key x
 sleep 2; snap 14-deploy-attempt
 key z
 sleep 2; snap 15-end-human-turn
+key s
+sleep 2; snap 16-trainer-bonus-command-attempt
 key x
-sleep 2; snap 16-pokemon-action-attempt
+sleep 2; snap 17-commanded-thunderbolt-attempt
 key z
-sleep 2; snap 17-end-pokemon-turn
+sleep 2; snap 17b-return-to-trainer
+key z
+sleep 2; snap 17c-end-shared-initiative
 key BackSpace
 sleep 2; snap 18-cancel-attempt
 # Preserve the exact ROM identity and reproducible input sequence alongside frames.
@@ -92,7 +96,7 @@ cat > "$OUT/input-sequence.txt" <<'EOF'
 Emulator: mGBA SDL; key mapping: BackSpace=SELECT, a=L, s=R,
 Return=START, x=A, z=B, arrow keys=D-pad.
 Entry attempts: L+R+START at frames 06 and 13.
-Actions: A deployment, B turn advancement, SELECT cancellation.
+Actions: A deployment, B ends trainer turn, R commands via Bonus Action,\nA uses commanded Thunderbolt, B returns to trainer, B ends shared turn,\nSELECT cancellation. Commands on a scripted title screen are not proof.
 No gameplay acceptance is inferred from these inputs.
 EOF
 # A caller may supply an exact-head linked ELF to identify debugger probe
