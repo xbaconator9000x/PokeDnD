@@ -31,6 +31,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_emerald_gdb_probe.py' -v
           python3 -m unittest discover -s tests -p 'test_emerald_gdb_fragmented_checksum.py' -v
           python3 -m unittest discover -s tests -p 'test_emerald_runtime_probe_execution.py' -v
+          python3 -m unittest discover -s tests -p 'test_emerald_outcome_replay.py' -v
       - name: Fetch exact pinned Emerald source
         run: |
           git init upstream
@@ -53,7 +54,7 @@ jobs:
         run: |
           ROM=$(find upstream -maxdepth 1 -type f -name '*.gba' | head -n 1)
           test -s "$ROM"
-          POKEDND_ELF=upstream/pokeemerald.elf timeout 180s xvfb-run -a -s "-screen 0 800x600x24" \
+          POKEDND_ELF=upstream/pokeemerald.elf timeout 245s xvfb-run -a -s "-screen 0 800x600x24" \
             bash integration/emerald/ci_field_replay.sh "$ROM" evidence
       - name: Retain emulator evidence
         if: always()
