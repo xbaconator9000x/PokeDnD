@@ -285,6 +285,50 @@ static void test_invalid_actor_ids_fail_closed(void)
     CHECK(!d20_attack(&b, b.count, e, TACKLE).legal);
     CHECK(b.units[h].action == 1);
 }
+static void test_real_victory_requires_a_landed_attack(void)
+{
+    D20Battle b; int h,p,e; D20Attack r = {0}; bool won = false;
+    setup(&b,&h,&p,&e);
+    b.units[e].hp = b.units[e].max_hp = 1;
+    b.units[e].ac = 2; /* Low-HP DEBUG encounter, not forced combat result. */
+    CHECK(seek(&b,h));
+    CHECK(d20_walk(&b,h,4,4));
+    for (int turn=0;turn<8;turn++) {
+        r=d20_attack(&b,h,e,TACKLE);
+        CHECK(r.legal);
+        if (r.hit) { won=true; break; }
+        CHECK(b.outcome==FIGHTING && b.units[e].hp==1);
+        CHECK(next_time(&b,h));
+    }
+    CHECK(won && b.outcome==ALLIES_WIN);
+    CHECK(r.damage==1 && b.units[e].hp==0);
+    CHECK(b.units[h].hp>0);
+    CHECK(d20_current(&b)==-1);
+    CHECK(!d20_next(&b));
+    CHECK(!d20_attack(&b,h,e,TACKLE).legal);
+}
+static void test_real_defeat_requires_enemy_knockout(void)
+{
+    D20Battle b; int h,p,e; D20Attack r = {0}; bool lost = false;
+    setup(&b,&h,&p,&e);
+    b.units[h].hp = b.units[h].max_hp = 1;
+    b.units[h].ac = 2;
+    b.units[e].stats[STR] = 18;
+    CHECK(seek(&b,e));
+    CHECK(d20_walk(&b,e,2,4));
+    for (int turn=0;turn<8;turn++) {
+        r=d20_attack(&b,e,h,TACKLE);
+        CHECK(r.legal);
+        if (r.hit) { lost=true; break; }
+        CHECK(b.outcome==FIGHTING && b.units[h].hp==1);
+        CHECK(next_time(&b,e));
+    }
+    CHECK(lost && b.outcome==ENEMIES_WIN);
+    CHECK(r.damage==1 && b.units[h].hp==0);
+    CHECK(b.units[e].hp>0);
+    CHECK(!d20_next(&b));
+    CHECK(!d20_attack(&b,e,h,TACKLE).legal);
+}
 int main(void)
 {
     test_ability_and_dice();
@@ -300,6 +344,8 @@ int main(void)
     test_uncommanded_dodge_and_invalid_owner();
     test_invalid_actor_ids_fail_closed();
     test_first_round_and_deployment_cooldown();
+    test_real_victory_requires_a_landed_attack();
+    test_real_defeat_requires_enemy_knockout();
     printf("PASS: PokeDnD trainer-initiative D20 core (%d assertions, 13 scenarios)\n", assertions);
     return 0;
 }
