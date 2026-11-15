@@ -59,6 +59,37 @@ def validate(rows):
                for i, r in enumerate(parsed)):
         raise ValueError("defeat lacks genuine enemy turn checkpoint")
 
+    # Intermediate checkpoints must be genuine samples from the same native
+    # encounter, not merely correctly named rows. In particular, reject
+    # outcome bits that were already present at encounter entry.
+    for prefix, attempt, marker, required_bit in (
+        ("victory", 2, "victory-attack-", 64),
+        ("defeat", 3, "defeat-turn-", 4),
+    ):
+        start_index = labels.index(prefix + "-start")
+        result_index = labels.index(prefix + "-result")
+        intermediates = [
+            r for r in parsed[start_index + 1:result_index]
+            if r["label"].startswith(marker)
+        ]
+        if not intermediates:
+            raise ValueError(prefix + " lacks intermediate native samples")
+        if parsed[start_index]["milestones"] & required_bit:
+            raise ValueError(prefix + " inherited combat milestone before input")
+        previous_bits = parsed[start_index]["milestones"]
+        for row in intermediates + [parsed[result_index]]:
+            if row["trigger_count"] != attempt or row["start_failure"]:
+                raise ValueError(prefix + " intermediate sample belongs to wrong encounter")
+            if row["milestones"] & previous_bits != previous_bits:
+                raise ValueError(prefix + " intermediate milestones regressed")
+            if row["outcome_acks"] != (0 if prefix == "victory" else 1):
+                raise ValueError(prefix + " result acknowledged before confirmation")
+            if row["post_cancel_moves"]:
+                raise ValueError(prefix + " moved before field restoration")
+            previous_bits = row["milestones"]
+        if not any(row["milestones"] & required_bit for row in intermediates):
+            raise ValueError(prefix + " lacks observed native attack/turn milestone")
+
     for name, start, result, confirm, resume, attempt, outcome, acks in (
         ("victory", vstart, vresult, vconfirm, vresume, 2, 1, 0),
         ("defeat", dstart, dresult, dconfirm, dresume, 3, 2, 1),
