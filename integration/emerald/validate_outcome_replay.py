@@ -13,6 +13,7 @@ REQUIRED = (
     "label", "trigger_count", "start_failure", "milestones",
     "diagnostic_state", "post_cancel_moves", "last_outcome",
     "last_human_hp", "last_enemy_hp", "outcome_acks",
+    "impact_starts", "impact_frames",
 )
 
 
@@ -127,8 +128,12 @@ def validate(rows):
             raise ValueError(name + " did not start a new live fight")
         if start["outcome_acks"] != acks:
             raise ValueError(name + " inherited unexpected result acknowledgement")
+        if start["impact_starts"] or start["impact_frames"]:
+            raise ValueError(name + " inherited impact animation before an attack")
         if result["last_outcome"] != outcome or result["outcome_acks"] != acks:
             raise ValueError(name + " lacks unacknowledged native result")
+        if result["impact_starts"] < 1 or result["impact_frames"] < 1:
+            raise ValueError(name + " lacks native sprite hit reaction frames")
         if result["diagnostic_state"] not in (1, 2, 3):
             raise ValueError(name + " result screen was already dismissed")
         if confirm["last_outcome"] != outcome or confirm["diagnostic_state"] != 5:
