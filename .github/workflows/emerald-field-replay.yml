@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - "integration/emerald/**"
+      - "tests/test_emerald_*.py"
       - "src/d20*"
       - "include/d20*"
       - ".github/workflows/emerald-field-replay.yml"
