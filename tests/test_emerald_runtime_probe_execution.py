@@ -59,10 +59,10 @@ class RuntimeProbeExecutionTests(unittest.TestCase):
                                        (1, 0, 135, 3), (1, 0, 167, 3),
                                        (1, 0, 231, 3), (1, 0, 231, 3)])[0], 0)
 
-    def test_faked_attack_without_command_rejected(self):
+    def test_late_failure_after_attack_rejected(self):
         self.assertNotEqual(run_trace([(0, 0, 0, 0), (1, 0, 1, 1), (1, 0, 3, 2),
-                                       (1, 0, 135, 3), (1, 0, 135, 3),
-                                       (1, 0, 199, 3), (1, 0, 207, 4)])[0], 0)
+                                       (1, 0, 135, 3), (1, 0, 167, 3),
+                                       (1, 0, 231, 3), (1, 2, 239, 4)])[0], 0)
 
     def test_wrong_native_state_rejected(self):
         self.assertNotEqual(run_trace([(0, 0, 0, 0), (1, 0, 1, 1),
