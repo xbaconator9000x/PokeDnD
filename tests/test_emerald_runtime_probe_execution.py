@@ -1,0 +1,66 @@
+"""Execute the real replay probe validator against representative emulator traces.
+
+These tests exercise the embedded validator rather than checking source strings.
+They do not constitute emulator gameplay acceptance.
+"""
+import pathlib
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / "integration/emerald/ci_field_replay.sh"
+
+
+def validator_source():
+    source = SCRIPT.read_text()
+    marker = 'python3 - "${POKEDND_RUNTIME_PROBE}" "$OUT" <<\'PY\'\n'
+    if marker not in source:
+        raise AssertionError("runtime validator heredoc missing")
+    return source.split(marker, 1)[1].split("\nPY\n", 1)[0]
+
+
+def run_trace(rows):
+    with tempfile.TemporaryDirectory() as temp:
+        folder = pathlib.Path(temp)
+        csv = folder / "trace.csv"
+        csv.write_text("trigger_count,start_failure,milestones\n" + "".join(
+            f"{t},{f},{m}\n" for t, f, m in rows))
+        result = subprocess.run(
+            [sys.executable, "-c", validator_source(), str(csv), str(folder)],
+            capture_output=True, text=True, check=False)
+        verdict = folder / "runtime-probe-verdict.txt"
+        return result.returncode, verdict.read_text() if verdict.exists() else ""
+
+
+class RuntimeProbeExecutionTests(unittest.TestCase):
+    def test_real_ordered_trace_passes(self):
+        status, verdict = run_trace([(1, 0, 1), (1, 0, 3), (1, 0, 7)])
+        self.assertEqual(status, 0)
+        self.assertTrue(verdict.startswith("PASS"))
+
+    def test_single_snapshot_rejected(self):
+        self.assertNotEqual(run_trace([(1, 0, 7)])[0], 0)
+
+    def test_no_trigger_rejected(self):
+        self.assertNotEqual(run_trace([(0, 0, 1), (0, 0, 3), (0, 0, 7)])[0], 0)
+
+    def test_admission_failure_rejected(self):
+        self.assertNotEqual(run_trace([(1, 2, 1), (1, 2, 3), (1, 2, 7)])[0], 0)
+
+    def test_missing_deployment_rejected(self):
+        self.assertNotEqual(run_trace([(1, 0, 1), (1, 0, 1), (1, 0, 5)])[0], 0)
+
+    def test_regressing_milestones_rejected(self):
+        self.assertNotEqual(run_trace([(1, 0, 3), (1, 0, 1), (1, 0, 7)])[0], 0)
+
+    def test_regressing_trigger_rejected(self):
+        self.assertNotEqual(run_trace([(2, 0, 1), (1, 0, 3), (2, 0, 7)])[0], 0)
+
+    def test_skipped_deployment_snapshot_rejected(self):
+        self.assertNotEqual(run_trace([(1, 0, 1), (1, 0, 7), (1, 0, 7)])[0], 0)
+
+
+if __name__ == "__main__":
+    unittest.main()
