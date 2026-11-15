@@ -5,6 +5,8 @@
 #define D20_W 12
 #define D20_H 10
 #define D20_MAX 20
+/* Tactical scale: one orthogonal map tile is five feet. */
+#define D20_FEET_PER_TILE 5
 typedef enum { STR, DEX, CON, INT, WIS, CHA, ABILITIES } D20Stat;
 typedef enum { HUMAN, POKEMON, ENEMY } D20Role;
 typedef enum { TACKLE, QUICK_ATTACK, THUNDERBOLT, SLEEP_POWDER } D20Move;
@@ -43,6 +45,9 @@ bool d20_select(D20Battle *b, int actor);
 bool d20_command(D20Battle *b, int owner, int pokemon, bool spendBonus);
 bool d20_next(D20Battle *b);
 bool d20_deploy(D20Battle *b, int owner, int pokemon, int x, int y);
+/* Convert a speed in feet to whole traversable tiles (round down). */
+uint8_t d20_speed_tiles(unsigned int feet);
+bool d20_dash(D20Battle *b, int actor);
 bool d20_walk(D20Battle *b, int actor, int x, int y);
 bool d20_los(const D20Battle *b, int x0, int y0, int x1, int y1);
 D20Attack d20_attack(D20Battle *b, int actor, int target, D20Move move);
