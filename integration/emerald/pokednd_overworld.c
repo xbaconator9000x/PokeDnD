@@ -44,6 +44,16 @@ EWRAM_DATA volatile u32 gPokeDnDStartFailure;
 /* Incremented only when the native field input hook actually sees the chord.
  * A zero value distinguishes input/hook failures from encounter rejection. */
 EWRAM_DATA volatile u32 gPokeDnDTriggerCount;
+/* Increment only after native Emerald accepts a new D-pad input following
+ * D20 cancellation AND the player's true map tile subsequently changes.
+ * A frame difference or key injection alone must not pass this check. */
+EWRAM_DATA volatile u32 gPokeDnDPostCancelMoves;
+static EWRAM_DATA bool8 sWatchPostCancelMove;
+static EWRAM_DATA bool8 sSawPostCancelDpad;
+static EWRAM_DATA u8 sPostCancelMapGroup;
+static EWRAM_DATA u8 sPostCancelMapNum;
+static EWRAM_DATA s16 sPostCancelX;
+static EWRAM_DATA s16 sPostCancelY;
 static EWRAM_DATA D20Battle sBattle;
 static EWRAM_DATA D20FieldProjection sProjection;
 static EWRAM_DATA D20FieldEncounter sUnits;
@@ -197,6 +207,9 @@ static bool StartCombat(void)
     /* Avoid scripts, link rooms, active movement and accidental re-entry. */
     if (sActive)
         return false;
+    sWatchPostCancelMove = FALSE;
+    sSawPostCancelDpad = FALSE;
+    gPokeDnDPostCancelMoves = 0;
     gPokeDnDDiagnosticState = 0;
     gPokeDnDMilestones = 0;
     gPokeDnDStartFailure = 0;
@@ -401,6 +414,25 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
 {
     int id;
     if (!sActive) {
+        /* Observe the *real* engine's player tile after normal field input
+         * has been restored. Require a new D-pad press first; changing map,
+         * stepping during rollback or an idle camera animation cannot pass. */
+        if (sWatchPostCancelMove) {
+            if (sPostCancelMapGroup != gSaveBlock1Ptr->location.mapGroup ||
+                sPostCancelMapNum != gSaveBlock1Ptr->location.mapNum) {
+                sWatchPostCancelMove = FALSE;
+            } else if (!ArePlayerFieldControlsLocked()) {
+                struct MapPosition position;
+                if (newKeys & (DPAD_UP | DPAD_DOWN | DPAD_LEFT | DPAD_RIGHT))
+                    sSawPostCancelDpad = TRUE;
+                GetPlayerPosition(&position);
+                if (sSawPostCancelDpad &&
+                    (position.x != sPostCancelX || position.y != sPostCancelY)) {
+                    gPokeDnDPostCancelMoves++;
+                    sWatchPostCancelMove = FALSE;
+                }
+            }
+        }
         if ((newKeys & START_BUTTON) && (heldKeys & D20_DEBUG_CHORD) == D20_DEBUG_CHORD) {
             gPokeDnDTriggerCount++;
             return StartCombat();
@@ -414,7 +446,18 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
         return FALSE;
     }
     if (newKeys & SELECT_BUTTON) {
+        struct MapPosition position;
         CleanupCombat(TRUE);
+        /* Arm only after cleanup. The next native field tick, not the D20
+         * cancellation frame, may count a genuine overworld tile step. */
+        GetPlayerPosition(&position);
+        sPostCancelX = position.x;
+        sPostCancelY = position.y;
+        sPostCancelMapGroup = gSaveBlock1Ptr->location.mapGroup;
+        sPostCancelMapNum = gSaveBlock1Ptr->location.mapNum;
+        sSawPostCancelDpad = FALSE;
+        sWatchPostCancelMove = TRUE;
+        gPokeDnDPostCancelMoves = 0;
         gPokeDnDDiagnosticState = 4;
         gPokeDnDMilestones |= 8u;
         return TRUE;
