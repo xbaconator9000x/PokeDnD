@@ -104,6 +104,24 @@ sleep 2; snap 10-pikachu-thunderbolt
 sample attacked
 key z
 sleep 2; snap 11-trainer-reselected
+# Trainer retains their Action after commanding Pikachu via Bonus Action.
+# Real L-held + newly pressed START must Dash for 6 extra five-foot tiles.
+xdotool keydown --window "$WINDOW" a
+key Return
+xdotool keyup --window "$WINDOW" a
+sleep 2; snap 11b-native-trainer-dash
+sample dashed
+python3 - "$OUT/runtime-probe.csv" <<'CHECKDASH'
+import csv, sys
+with open(sys.argv[1], newline="") as handle:
+    rows = list(csv.DictReader(handle))
+row = rows[-1]
+if row["label"] != "dashed" or int(row["dash_count"]) != 1 or int(row["last_dash_movement"]) != 12:
+    raise SystemExit("FAIL: live mGBA Dash did not grant six additional movement tiles")
+if int(row["start_failure"]) != 0:
+    raise SystemExit("FAIL: Dash replay triggered encounter admission failure")
+print("PASS: native Dash consumed trainer Action and granted 12 movement tiles")
+CHECKDASH
 key z
 sleep 2; snap 12-shared-turn-ended
 key BackSpace
@@ -199,7 +217,7 @@ sha256sum "$ROM" | awk '{print $1}' > "$OUT/rom-sha256.txt"
 cat > "$OUT/input-sequence.txt" <<'EOF'
 Emulator: mGBA SDL; key mapping: BackSpace=SELECT, a=L, s=R,
 Return=START, x=A, z=B, arrow keys=D-pad.
-One field encounter: L+R+START at frame 06.
+One field encounter: L+R+START at frame 06. After Pikachu attacks,\nB reselects the trainer; hold L and press START to Dash, verified by\nlive mGBA EWRAM dash_count=1 and last_dash_movement=12.
 A deploys Pikachu, B advances the shared initiative, R commands via a
 trainer Bonus Action, A attempts Thunderbolt, B reselects trainer, B ends
 the shared turn, SELECT cancels, Right checks ordinary field movement.
