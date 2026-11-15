@@ -45,11 +45,25 @@ def validate(rows):
     dconfirm = checkpoint("defeat-confirmed")
     dresume = checkpoint("defeat-resumed")
     labels = [r["label"] for r in parsed]
+    # Reject unaccounted samples and checkpoints outside their own encounter.
+    # A correct name alone must never make a stale debugger row admissible.
+    allowed = set(("victory-start", "victory-result", "victory-confirmed",
+                   "victory-resumed", "defeat-start", "defeat-result",
+                   "defeat-confirmed", "defeat-resumed"))
+    for label in labels:
+        if label not in allowed and not (label.startswith("victory-attack-")
+                                         or label.startswith("defeat-turn-")):
+            raise ValueError("unexpected native outcome checkpoint: " + label)
     sequence = ["victory-start", "victory-result", "victory-confirmed",
                 "victory-resumed", "defeat-start", "defeat-result",
                 "defeat-confirmed", "defeat-resumed"]
     if [labels.index(n) for n in sequence] != sorted(labels.index(n) for n in sequence):
         raise ValueError("native outcome events out of order")
+    for i, label in enumerate(labels):
+        if label.startswith("victory-attack-") and not (labels.index("victory-start") < i < labels.index("victory-result")):
+            raise ValueError("victory attack checkpoint outside encounter")
+        if label.startswith("defeat-turn-") and not (labels.index("defeat-start") < i < labels.index("defeat-result")):
+            raise ValueError("defeat turn checkpoint outside encounter")
     if not any(r["label"].startswith("victory-attack-") and
                labels.index("victory-start") < i < labels.index("victory-result")
                for i, r in enumerate(parsed)):
