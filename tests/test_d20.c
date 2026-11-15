@@ -329,8 +329,35 @@ static void test_real_defeat_requires_enemy_knockout(void)
     CHECK(!d20_next(&b));
     CHECK(!d20_attack(&b,e,h,TACKLE).legal);
 }
+static void test_speed_tiles_and_dash(void)
+{
+    D20Battle b; int h,p,e;
+    CHECK(d20_speed_tiles(0)==0);
+    CHECK(d20_speed_tiles(5)==1);
+    CHECK(d20_speed_tiles(25)==5);
+    CHECK(d20_speed_tiles(30)==6);
+    CHECK(d20_speed_tiles(35)==7);
+    CHECK(d20_speed_tiles(9999)==255);
+    setup(&b,&h,&p,&e);
+    CHECK(seek(&b,h));
+    CHECK(b.units[h].speed==6 && b.units[h].movement==6);
+    CHECK(d20_walk(&b,h,1,6));
+    CHECK(b.units[h].movement==4);
+    CHECK(d20_dash(&b,h));
+    CHECK(b.units[h].movement==10 && b.units[h].action==0);
+    CHECK(!d20_dash(&b,h));
+    CHECK(d20_walk(&b,h,1,9));
+    CHECK(b.units[h].movement==7);
+    CHECK(!d20_attack(&b,h,e,TACKLE).legal);
+    CHECK(next_time(&b,h));
+    CHECK(b.units[h].movement==6 && b.units[h].action==1);
+    CHECK(d20_dash(&b,h));
+    CHECK(b.units[h].movement==12);
+}
+
 int main(void)
 {
+    test_speed_tiles_and_dash();
     test_ability_and_dice();
     test_party_limits();
     test_initiative_deploy_and_command();
