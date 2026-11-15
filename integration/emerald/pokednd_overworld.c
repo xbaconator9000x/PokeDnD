@@ -669,7 +669,7 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
         if (id == sUnits.human) {
             /* L+START spends the trainer Action to Dash, doubling the
              * remaining tile budget without resetting already-used steps. */
-            if ((newKeys & (L_BUTTON | START_BUTTON)) == (L_BUTTON | START_BUTTON)) {
+            if ((newKeys & START_BUTTON) && (heldKeys & L_BUTTON)) {
                 if (d20_dash(&sBattle, id))
                     PokeDnD_HudMessage(COMPOUND_STRING("DASH +SPEED TILES"));
             } else {
