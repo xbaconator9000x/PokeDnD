@@ -144,6 +144,17 @@ class OutcomeReplayTests(unittest.TestCase):
         self.assertRaisesRegex(ValueError, "unexpected native outcome checkpoint",
                                outcomes.validate, rows)
 
+    def test_complete_live_csv_with_standard_encounter_accepted(self):
+        standard = [sample(label, 1, 0, 0, 0, 0, 0, 0, 0) for label in
+                    ("baseline", "started", "deployed", "turn", "commanded",
+                     "attacked", "cancelled", "resumed")]
+        self.assertTrue(outcomes.validate(standard + good_trace()).startswith("PASS"))
+
+    def test_misplaced_standard_checkpoint_rejected(self):
+        rows = good_trace()
+        rows.insert(1, sample("baseline", 1, 0, 0, 0, 0, 0, 0, 0))
+        self.assertRaisesRegex(ValueError, "out of order", outcomes.validate, rows)
+
     def test_missing_register_rejected(self):
         rows = good_trace()
         rows[0].pop("last_outcome")
