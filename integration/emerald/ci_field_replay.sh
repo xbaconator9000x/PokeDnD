@@ -107,7 +107,7 @@ if [ -n "${POKEDND_ELF:-}" ]; then
       exit 1
     fi
   done
-  awk '$3 ~ /^gPokeDnD(TriggerCount|StartFailure|DiagnosticState|Milestones)$/ {print}' \\
+  awk '$3 ~ /^gPokeDnD(TriggerCount|StartFailure|DiagnosticState|Milestones)$/ {print}' \
     "$OUT/linked-symbols.txt" > "$OUT/probe-addresses.txt"
 fi
 # Diagnostic screenshots are not acceptance evidence. Record image changes
