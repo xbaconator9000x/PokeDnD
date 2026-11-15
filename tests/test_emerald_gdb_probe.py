@@ -90,7 +90,7 @@ class FakeGDB:
 class GDBProbeTests(unittest.TestCase):
     def test_symbol_addresses_are_validated_in_gba_ewram(self):
         elf = Path("/unused.elf")
-        values = [0x02000100, 0x02000104, 0x02000108, 0x0200010c]
+        values = [0x02000100, 0x02000104, 0x02000108, 0x0200010c, 0x02000110]
         output = "".join(f"{addr:08x} B {name}\n"
                          for name, addr in zip(probe.NAMES, values))
         with mock.patch.object(probe.subprocess, "check_output", return_value=output):
@@ -107,8 +107,8 @@ class GDBProbeTests(unittest.TestCase):
     def test_live_gdb_snapshot_reads_32_bit_values_and_resumes(self):
         a, b = socket.socketpair()
         memory = bytearray(0x200)
-        addresses = dict(zip(probe.NAMES, (0x100, 0x104, 0x108, 0x10c)))
-        expected = (1, 0, 3, 2)
+        addresses = dict(zip(probe.NAMES, (0x100, 0x104, 0x108, 0x10c, 0x110)))
+        expected = (1, 0, 3, 2, 1)
         for index, number in enumerate(expected):
             memory[0x100 + index * 4:0x104 + index * 4] = number.to_bytes(4, "little")
         fake = FakeGDB(b, memory)
