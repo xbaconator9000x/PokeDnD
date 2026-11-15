@@ -66,7 +66,12 @@ class RemoteGDB:
                 if char == b"#":
                     break
                 data.extend(char)
-            checksum = self.sock.recv(2)
+            checksum = bytearray()
+            while len(checksum) < 2:
+                fragment = self.sock.recv(2 - len(checksum))
+                if not fragment:
+                    raise ConnectionError("mGBA closed during GDB checksum")
+                checksum.extend(fragment)
             expected = sum(data) % 256
             if checksum.lower() != ("%02x" % expected).encode("ascii"):
                 self.sock.sendall(b"-")
