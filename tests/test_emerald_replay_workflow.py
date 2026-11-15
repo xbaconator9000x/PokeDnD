@@ -41,10 +41,10 @@ class ReplayWorkflowTests(unittest.TestCase):
         self.assertIn("started[3] == 1 and deployed[3] == 2 and turned[3] == 3", script)
         self.assertIn("(started[2] & 255) == 1", script)
         self.assertIn("(deployed[2] & 255) == 3", script)
-        self.assertIn("(turned[2] & 135) == 135", script)
-        self.assertIn("(commanded[2] & 32) == 32", script)
-        self.assertIn("(attacked[2] & 96) == 96", script)
-        self.assertIn("(cancelled[2] & 239) == 239", script)
+        self.assertIn("(turned[2] & 255) == 135", script)
+        self.assertIn("(commanded[2] & 255) == 167", script)
+        self.assertIn("(attacked[2] & 255) == 231", script)
+        self.assertIn("(cancelled[2] & 255) == 239", script)
         self.assertNotIn("passed = any(t > 0 and f == 0 and (m & 7) == 7", script)
 
     def test_upstream_pin_matches_native_build(self):
