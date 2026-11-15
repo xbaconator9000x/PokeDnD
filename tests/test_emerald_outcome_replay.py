@@ -80,11 +80,17 @@ class OutcomeReplayTests(unittest.TestCase):
     def test_no_fake_attack_or_enemy_turn(self):
         rows = good_trace()
         rows[2]["milestones"] = "39"
-        self.assertRaisesRegex(ValueError, "legal Pokémon attack",
+        self.assertRaisesRegex(ValueError, "intermediate milestones regressed",
                                outcomes.validate, rows)
         rows = good_trace()
         rows.pop(6)
         self.assertRaisesRegex(ValueError, "enemy turn checkpoint",
+                               outcomes.validate, rows)
+
+    def test_result_cannot_erase_observed_attack(self):
+        rows = good_trace()
+        rows[2]["milestones"] = "39"
+        self.assertRaisesRegex(ValueError, "intermediate milestones regressed",
                                outcomes.validate, rows)
 
     def test_checkpoint_order_and_duplicates(self):
