@@ -25,7 +25,7 @@ concurrency:
 jobs:
   emerald-native:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 40
     env:
       GAME_VERSION: EMERALD
       COMPARE: 0
@@ -63,24 +63,6 @@ jobs:
           test "$(stat -c %s "$ROM")" -le 33554432
           echo "Native integrated Emerald image: $(stat -c %s "$ROM") bytes"
           sha256sum "$ROM"
-      - name: Upload private experimental integrated ROM
-        uses: actions/upload-artifact@v4
-        with:
-          name: pokednd-poc02-emerald-integrated-private
-          path: upstream/*.gba
-          if-no-files-found: error
-          retention-days: 7
-
-  emerald-native-boot:
-    needs: emerald-native
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - name: Download exact-head private Emerald ROM
-        uses: actions/download-artifact@v4
-        with:
-          name: pokednd-poc02-emerald-integrated-private
-          path: rom
       - name: Install native mGBA and display capture
         run: |
           sudo apt-get update -qq
@@ -88,7 +70,7 @@ jobs:
       - name: Native Emerald ROM boots to a rendered LCD screen
         run: |
           mkdir -p evidence
-          ROM=$(find rom -name "*.gba" -type f | head -n 1)
+          ROM=$(find upstream -maxdepth 1 -name '*.gba' -type f | head -n 1)
           test -s "$ROM"
           timeout 65s xvfb-run -a -s "-screen 0 800x600x24" bash -euo pipefail -c '
             export SDL_VIDEODRIVER=x11 SDL_AUDIODRIVER=dummy
@@ -118,7 +100,7 @@ jobs:
           test -s evidence/emerald-native-lcd.png
           COLORS=$(identify -format %k evidence/emerald-native-lcd.png)
           test "$COLORS" -gt 8
-      - name: Upload genuine mGBA LCD evidence
+      - name: Upload real mGBA LCD evidence only (NO ROM binaries)
         if: always()
         uses: actions/upload-artifact@v4
         with:
