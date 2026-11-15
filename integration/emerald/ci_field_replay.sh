@@ -96,9 +96,40 @@ cat > "$OUT/input-sequence.txt" <<'EOF'
 Emulator: mGBA SDL; key mapping: BackSpace=SELECT, a=L, s=R,
 Return=START, x=A, z=B, arrow keys=D-pad.
 Entry attempts: L+R+START at frames 06 and 13.
-Actions: A deployment, B ends trainer turn, R commands via Bonus Action,\nA uses commanded Thunderbolt, B returns to trainer, B ends shared turn,\nSELECT cancellation. Commands on a scripted title screen are not proof.
+Actions: A deployment, B ends trainer turn, R commands via Bonus Action,
+A uses commanded Thunderbolt, B returns to trainer, B ends shared turn,
+SELECT cancellation. Commands on a scripted title screen are not proof.
 No gameplay acceptance is inferred from these inputs.
 EOF
+# Require an explicitly supplied emulator memory snapshot for gameplay acceptance.
+# A linked ELF or a screenshot alone is not a runtime observation.
+# Expected CSV columns: trigger_count,start_failure,milestones (integer or 0x hex).
+# Milestones bit 0=start, bit 1=deploy, bit 2=turn.
+if [ -n "${POKEDND_RUNTIME_PROBE:-}" ]; then
+  python3 - "${POKEDND_RUNTIME_PROBE}" "$OUT" <<'PY'
+import csv, pathlib, sys
+source, out = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+with source.open(newline="") as handle:
+    rows = list(csv.DictReader(handle))
+required = {"trigger_count", "start_failure", "milestones"}
+if not rows or not required.issubset(rows[0]):
+    raise SystemExit("FAIL: missing runtime probe rows or columns")
+observed = []
+for row in rows:
+    trigger, failure, bits = (int(row[k], 0) for k in
+                              ("trigger_count", "start_failure", "milestones"))
+    if min(trigger, failure, bits) < 0:
+        raise SystemExit("FAIL: negative runtime probe value")
+    observed.append((trigger, failure, bits))
+passed = any(t > 0 and f == 0 and (m & 7) == 7 for t, f, m in observed)
+(out / "runtime-probe-verdict.txt").write_text(
+    ("PASS" if passed else "FAIL") +
+    ": observed native trigger, admission, deployment and turn milestones\\n"
+)
+if not passed:
+    raise SystemExit("FAIL: runtime probe does not establish tactical gameplay")
+PY
+fi
 # A caller may supply an exact-head linked ELF to identify debugger probe
 # addresses. This does NOT claim those variables were read from the emulator.
 if [ -n "${POKEDND_ELF:-}" ]; then
@@ -129,7 +160,9 @@ fi
 cat > "$OUT/ACCEPTANCE_NOT_VERIFIED.txt" <<'EOF'
 This artifact contains genuine mGBA display captures, NOT verified tactical gameplay.
 A green workflow means the emulator and capture harness ran successfully.
-First read gPokeDnDTriggerCount: zero means the field hook never saw the chord.\nIf positive, read gPokeDnDStartFailure to diagnose admission rejection.\nBefore accepting combat, read native gPokeDnDDiagnosticState from emulated
+First read gPokeDnDTriggerCount: zero means the field hook never saw the chord.
+If positive, read gPokeDnDStartFailure to diagnose admission rejection.
+Before accepting combat, read native gPokeDnDDiagnosticState from emulated
 EWRAM and verify ordered transitions: 1 encounter, 2 deployment, 3 turn,
 4 cancellation (or 5 completion). Do not infer these from filenames or PNGs.
 EOF
