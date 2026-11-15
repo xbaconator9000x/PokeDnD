@@ -44,6 +44,14 @@ class RuntimeProbeExecutionTests(unittest.TestCase):
         self.assertEqual(status, 0)
         self.assertTrue(verdict.startswith("PASS"))
 
+    def test_attack_already_spent_before_command_rejected(self):
+        # A later A press cannot prove an attack if unrelated earlier inputs
+        # had already set the sticky attack milestone.
+        self.assertNotEqual(run_trace([(0, 0, 0, 0), (1, 0, 1, 1),
+                                       (1, 0, 3, 2), (1, 0, 135, 3),
+                                       (1, 0, 231, 3), (1, 0, 231, 3),
+                                       (1, 0, 239, 4)])[0], 0)
+
     def test_missing_command_rejected(self):
         self.assertNotEqual(run_trace([(0, 0, 0, 0), (1, 0, 1, 1), (1, 0, 3, 2),
                                        (1, 0, 135, 3), (1, 0, 135, 3),
