@@ -103,7 +103,7 @@ No gameplay acceptance is inferred from these inputs.
 EOF
 # Require an explicitly supplied emulator memory snapshot for gameplay acceptance.
 # A linked ELF or a screenshot alone is not a runtime observation.
-# Expected CSV columns: trigger_count,start_failure,milestones (integer or 0x hex).
+# Expected CSV columns: trigger_count,start_failure,milestones,diagnostic_state (integer or 0x hex).
 # Milestones bit 0=start, bit 1=deploy, bit 2=turn.
 if [ -n "${POKEDND_RUNTIME_PROBE:-}" ]; then
   python3 - "${POKEDND_RUNTIME_PROBE}" "$OUT" <<'PY'
@@ -111,16 +111,16 @@ import csv, pathlib, sys
 source, out = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
 with source.open(newline="") as handle:
     rows = list(csv.DictReader(handle))
-required = {"trigger_count", "start_failure", "milestones"}
+required = {"trigger_count", "start_failure", "milestones", "diagnostic_state"}
 if not rows or not required.issubset(rows[0]):
     raise SystemExit("FAIL: missing runtime probe rows or columns")
 observed = []
 for row in rows:
-    trigger, failure, bits = (int(row[k], 0) for k in
-                              ("trigger_count", "start_failure", "milestones"))
-    if min(trigger, failure, bits) < 0:
+    trigger, failure, bits, state = (int(row[k], 0) for k in
+                              ("trigger_count", "start_failure", "milestones", "diagnostic_state"))
+    if min(trigger, failure, bits, state) < 0:
         raise SystemExit("FAIL: negative runtime probe value")
-    observed.append((trigger, failure, bits))
+    observed.append((trigger, failure, bits, state))
 # A single synthetic or stale all-bits-set row is not a replay trace.
 # Require sequential emulator observations of activation, deployment and turn.
 # Trigger counts must never decrease and milestone bits must be monotonic.
@@ -138,9 +138,11 @@ passed = False
 for i in range(len(observed) - 3):
     baseline, started, deployed, turned = observed[i:i + 4]
     attempt = started[0]
-    if (baseline[0] < attempt and baseline[2] & 7 == 0
+    if (baseline[0] + 1 == attempt and baseline[1] == 0
+            and baseline[2] & 7 == 0 and baseline[3] == 0
             and all(row[0] == attempt and row[1] == 0
                     for row in (started, deployed, turned))
+            and started[3] == 1 and deployed[3] == 2 and turned[3] == 3
             and (started[2] & 7) == 1
             and (deployed[2] & 7) == 3
             and (turned[2] & 7) == 7):
@@ -148,7 +150,7 @@ for i in range(len(observed) - 3):
         break
 (out / "runtime-probe-verdict.txt").write_text(
     ("PASS" if passed else "FAIL") +
-    ": observed native trigger, admission, deployment and turn milestones\\n"
+    ": observed native trigger, admission, deployment and turn milestones plus native states\\n"
 )
 if not passed:
     raise SystemExit("FAIL: runtime probe does not establish tactical gameplay")
