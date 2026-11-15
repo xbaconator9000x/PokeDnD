@@ -46,8 +46,9 @@ The portable C99 rules engine is compiled into actual Emerald and called by
 **Unimplemented:** dedicated turn HUD, cover mechanics, complex AI, actual
 class/subclass progression, six deployed Pokémon, type chart, full 5.5e spell
 conditions and concentration, animations, quest outcomes, XP, saving and
-gameplay persistence. Visual gameplay on a live Emerald field has not yet
-been accepted.
+gameplay persistence. The native tactical inputs now have real mGBA memory
+evidence, but the graphical combat presentation and a polished playable loop
+still require work.
 
 ## Reproducible evidence
 
@@ -65,14 +66,30 @@ fail-closed patches the exact pinned `WarpToTruck` source to spawn outdoors
 at Oldale Town (10, 12), clear of scripted trigger coordinates and NPCs.
 Normal adapter builds preserve Emerald's original new-game warp.
 
-The replay workflow runs Python regression tests for the default and replay
-boot paths, rejects changed source anchors, and retains diagnostic captures.
-**Screenshots, a successful source build or a green mGBA replay do not
-establish tactical gameplay acceptance** without live EWRAM transitions.
+The replay workflow runs Python regressions for the default/replay boots
+and a mock GDB remote peer, then connects directly to the **running mGBA
+debugger stub** (`mgba -g`) and reads the exact ARM-linked EWRAM variables.
+A real, exact-head mGBA run at commit `d5c5df86521e6570f79d0c5fecc77a3914e64458`
+passed 4/4 workflows and returned the following ordered live samples:
 
-Required next proof: trigger the Rocket encounter on a live Emerald map,
-send out Pikachu, act with both combatants, resolve an attack, cancel or win,
-and resume field movement, all captured by native emulator inputs.
+| Input checkpoint | Trigger | Failure | Sticky bits | Native state |
+| --- | ---: | ---: | ---: | ---: |
+| Field baseline | 0 | 0 | 0 | 0 |
+| L+R+START encounter | 1 | 0 | 1 | 1 |
+| A deploy Pikachu | 1 | 0 | 3 | 2 |
+| B advance turn | 1 | 0 | 135 | 3 |
+| SELECT cancel | 1 | 0 | 239 | 4 |
+
+The sticky bits at cancellation also confirm a trainer command, legal Pokémon
+attack and automatic Dodge were processed. The subsequent fail-closed replay
+checks now require distinct live samples for command and attack before
+cancellation; these stronger checks must pass at their own exact HEAD.
+Evidence: https://github.com/xbaconator9000x/PokeDnD/actions/runs/43707170926
+
+Remaining gameplay acceptance: visible turn/initiative/HP feedback, a clear
+attack animation or message, observable damage/defeat, and independently
+confirmed map movement after cancellation. A green compile, screen recording
+or synthesized CSV must never be substituted for actual mGBA state reads.
 
 No private ROM bytes, Shattered assets, saves, keys or copyrighted sprite
 assets are committed here. Build artifacts are held privately for seven days.
