@@ -38,6 +38,7 @@ static const u8 sTxtDeploy[]    = _("A:DEPLOY  START:HIT  B:END");
 static const u8 sTxtTrainer[]   = _("R:CMD  START:HIT  B:END");
 static const u8 sTxtPokemonAct[]= _("A:BOLT  R:QUICK  B:BACK");
 static const u8 sTxtEnemyTurn[] = _("ENEMY TURN");
+static const u8 sTxtFinish[]    = _("A/B: RETURN TO FIELD");
 static const u8 sTxtBegin[]     = _("ROCKET ENCOUNTER");
 static const u8 sTxtHit[]       = _(" HIT ");
 static const u8 sTxtCrit[]      = _(" CRIT ");
@@ -117,7 +118,9 @@ void PokeDnD_HudRedraw(const D20Battle *battle)
     AppendHp(line, rocket);
     PrintLine(line, 12);
 
-    if (d20_current(battle) == sEnemyId)
+    if (battle->outcome != FIGHTING)
+        PrintLine(sTxtFinish, 24);
+    else if (d20_current(battle) == sEnemyId)
         PrintLine(sTxtEnemyTurn, 24);
     else if (actor == sPokemonId)
         PrintLine(sTxtPokemonAct, 24);
