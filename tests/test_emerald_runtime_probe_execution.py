@@ -38,9 +38,31 @@ def run_trace(rows):
 
 class RuntimeProbeExecutionTests(unittest.TestCase):
     def test_real_ordered_trace_passes(self):
-        status, verdict = run_trace([(0, 0, 0, 0), (1, 0, 1, 1), (1, 0, 3, 2), (1, 0, 7, 3)])
+        status, verdict = run_trace([(0, 0, 0, 0), (1, 0, 1, 1), (1, 0, 3, 2),
+                                     (1, 0, 135, 3), (1, 0, 167, 3),
+                                     (1, 0, 231, 3), (1, 0, 239, 4)])
         self.assertEqual(status, 0)
         self.assertTrue(verdict.startswith("PASS"))
+
+    def test_missing_command_rejected(self):
+        self.assertNotEqual(run_trace([(0, 0, 0, 0), (1, 0, 1, 1), (1, 0, 3, 2),
+                                       (1, 0, 135, 3), (1, 0, 135, 3),
+                                       (1, 0, 199, 3), (1, 0, 207, 4)])[0], 0)
+
+    def test_missing_attack_rejected(self):
+        self.assertNotEqual(run_trace([(0, 0, 0, 0), (1, 0, 1, 1), (1, 0, 3, 2),
+                                       (1, 0, 135, 3), (1, 0, 167, 3),
+                                       (1, 0, 167, 3), (1, 0, 175, 4)])[0], 0)
+
+    def test_missing_cancel_rejected(self):
+        self.assertNotEqual(run_trace([(0, 0, 0, 0), (1, 0, 1, 1), (1, 0, 3, 2),
+                                       (1, 0, 135, 3), (1, 0, 167, 3),
+                                       (1, 0, 231, 3), (1, 0, 231, 3)])[0], 0)
+
+    def test_faked_attack_without_command_rejected(self):
+        self.assertNotEqual(run_trace([(0, 0, 0, 0), (1, 0, 1, 1), (1, 0, 3, 2),
+                                       (1, 0, 135, 3), (1, 0, 135, 3),
+                                       (1, 0, 199, 3), (1, 0, 207, 4)])[0], 0)
 
     def test_wrong_native_state_rejected(self):
         self.assertNotEqual(run_trace([(0, 0, 0, 0), (1, 0, 1, 1),
