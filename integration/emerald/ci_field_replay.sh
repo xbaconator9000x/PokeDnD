@@ -152,7 +152,7 @@ for attempt in 1 2 3 4 5; do
   key x
   # Capture the genuine post-hit LCD *before* the 32-frame impact ends.
   # This is not independently proof of a hit; the native counters below are.
-  snap "16a-victory-attack-impact-$attempt"
+  snap "15b-victory-attack-impact-$attempt"
   sleep 1
   sample "victory-attack-$attempt"
   if [ "$(last_outcome)" = 1 ]; then break; fi
@@ -178,7 +178,7 @@ sample defeat-start
 test "$(last_outcome)" = 0 || { echo "Native defeat entry failed" >&2; exit 1; }
 for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
   key z
-  snap "20a-defeat-turn-impact-$attempt"
+  snap "19b-defeat-turn-impact-$attempt"
   sleep 1
   sample "defeat-turn-$attempt"
   if [ "$(last_outcome)" = 2 ]; then break; fi
