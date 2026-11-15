@@ -115,6 +115,17 @@ def validate(rows):
             previous_bits = row["milestones"]
         if not any(row["milestones"] & required_bit for row in intermediates):
             raise ValueError(prefix + " lacks observed native attack/turn milestone")
+        # The terminal KO must be visible at an actual input/initiative
+        # checkpoint, not appear for the first time in a fabricated result row.
+        terminal = 1 if prefix == "victory" else 2
+        ko_register = "last_enemy_hp" if prefix == "victory" else "last_human_hp"
+        survivor = "last_human_hp" if prefix == "victory" else "last_enemy_hp"
+        if not any(row["last_outcome"] == terminal and row[ko_register] == 0
+                   and row[survivor] > 0 and row["impact_frames"] > 0
+                   and row["impact_starts"] > 0 for row in intermediates):
+            raise ValueError(prefix + " lacks observed native terminal damage at input checkpoint")
+        if any(row["last_outcome"] not in (0, terminal) for row in intermediates):
+            raise ValueError(prefix + " intermediate has conflicting outcome")
 
     for name, start, result, confirm, resume, attempt, outcome, acks in (
         ("victory", vstart, vresult, vconfirm, vresume, 2, 1, 0),
