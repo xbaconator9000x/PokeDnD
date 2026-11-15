@@ -40,6 +40,7 @@ static const u8 sTxtPokemonAct[]= _("A:BOLT  R:QUICK  B:BACK");
 static const u8 sTxtEnemyTurn[] = _("ENEMY TURN");
 static const u8 sTxtFinish[]    = _("A/B: RETURN TO FIELD");
 static const u8 sTxtBegin[]     = _("ROCKET ENCOUNTER");
+static const u8 sTxtRoll[]      = _(" d20:");
 static const u8 sTxtHit[]       = _(" HIT ");
 static const u8 sTxtCrit[]      = _(" CRIT ");
 static const u8 sTxtMiss[]      = _(" MISSED");
@@ -143,12 +144,16 @@ void PokeDnD_HudAttack(const u8 *move, D20Attack attack)
     if (!sHudOpen || move == NULL)
         return;
     StringCopy(sHudMessage, move);
-    if (!attack.legal)
+    if (!attack.legal) {
         StringAppend(sHudMessage, sTxtIllegal);
-    else if (!attack.hit)
+        return;
+    }
+    /* Show the actual natural d20 roll, not an invented animation result. */
+    StringAppend(sHudMessage, sTxtRoll);
+    AppendNumber(sHudMessage, attack.natural);
+    if (!attack.hit) {
         StringAppend(sHudMessage, sTxtMiss);
-    else
-    {
+    } else {
         StringAppend(sHudMessage, attack.crit ? sTxtCrit : sTxtHit);
         AppendNumber(sHudMessage, attack.damage);
     }
