@@ -44,7 +44,8 @@ int main(void)
     if (!seek(&b, hero) || !d20_deploy(&b, hero, pikachu, 2, 4)) return 1;
     puts("\nHuman spends Action: send out Pikachu!");
     board(&b);
-    if (!seek(&b, hero) || !d20_command(&b, hero, pikachu, true)) return 1;
+    if (!d20_next(&b) || !seek(&b, hero) ||
+        !d20_command(&b, hero, pikachu, true)) return 1;
     puts("Trainer spends Bonus Action: command Pikachu!");
     hit = d20_attack(&b, pikachu, grunt, THUNDERBOLT);
     if (!hit.legal) return 1;
