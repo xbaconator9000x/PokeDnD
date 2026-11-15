@@ -23,7 +23,7 @@ def validate(rows):
     if set(REQUIRED) - set(rows[0]):
         raise ValueError("missing native outcome or HP registers")
     standard_labels = ("baseline", "started", "deployed", "turn",
-                       "commanded", "attacked", "cancelled", "resumed")
+                       "commanded", "attacked", "dashed", "cancelled", "resumed")
     # The live debugger CSV contains the preceding standard encounter too.
     # Accept only its known, ordered labels and exclude it from the outcome
     # checkpoint validator; unknown labels still fail closed.
