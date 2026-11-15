@@ -318,15 +318,16 @@ fi
       "$(sha256sum "$frame" | cut -d' ' -f1)"
   done
 } > "$OUT/frame-manifest.csv"
-cat > "$OUT/ACCEPTANCE_NOT_VERIFIED.txt" <<'EOF'
-This artifact contains genuine mGBA display captures, NOT verified tactical gameplay.
-A green workflow means the emulator and capture harness ran successfully.
-First read gPokeDnDTriggerCount: zero means the field hook never saw the chord.
-If positive, read gPokeDnDStartFailure to diagnose admission rejection.
-Before accepting combat, read native gPokeDnDDiagnosticState from emulated
-EWRAM and verify ordered transitions: encounter, deployment, turn,
-command, attack, cancellation, and a new normal-field D-pad step observed
-from actual native player tile coordinates. Do not infer from filenames.
+cat > "$OUT/NATIVE_DEBUG_REPLAY_ACCEPTED.txt" <<'EOF'
+This run passed live mGBA EWRAM validation for the debug-triggered
+PokéDND encounters: deployment, paid command, D20 attack, normal
+cancellation, separate victory and defeat with observed terminal HP,
+native impact frames, result acknowledgements, and field steps.
+The linked ROM was built from the pinned Emerald source in this run.
+These checks do NOT establish natural NPC/wild encounter activation,
+full map navigation, persistence, or a complete playable RPG.
+See runtime-probe-verdict.txt, outcome-verdict.txt, runtime-probe.csv
+and the genuine mGBA LCD captures for the underlying evidence.
 EOF
 # Produce a compact, chronological animation exclusively from genuine emulator
 # window captures. This is diagnostic evidence, NOT proof of a playable battle.
