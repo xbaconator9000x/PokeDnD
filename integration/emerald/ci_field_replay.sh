@@ -41,7 +41,9 @@ test -f "$OUT/ewram-probe-ready.txt" || {
 sample() {
   python3 integration/emerald/mgba_ewram_probe.py sample --out "$OUT" --label "$1"
 }
-POKEDND_RUNTIME_PROBE="$OUT/runtime-probe.csv"
+POKEDND_RUNTIME_PROBE="$OUT/runtime-probe-standard.csv"
+# The GDB collector always writes runtime-probe.csv; preserve the first
+# encounter after it finishes before validating sequential session resets.
 snap() {
   local name="$1"
   timeout 6s xwd -silent -id "$WINDOW" | convert xwd:- "$OUT/$name.png"
@@ -111,6 +113,82 @@ sample cancelled
 key Right
 sleep 2; snap 14-normal-field-movement
 sample resumed
+# Preserve the proven standard encounter separately: sticky milestones reset
+# legitimately on every *new* battle, so validate that original session alone.
+cp "$OUT/runtime-probe.csv" "$OUT/runtime-probe-standard.csv"
+
+# Native win/loss scenarios keep the same authentic collision, sprites,
+# initiative, hit rolls, HP damage and outcome transitions. Only initial
+# health/AC differ, selected via UP/DOWN held on the debug chord.
+chord_with_direction() {
+  local direction="$1"
+  xdotool keydown --window "$WINDOW" a
+  xdotool keydown --window "$WINDOW" s
+  xdotool keydown --window "$WINDOW" "$direction"
+  key Return
+  xdotool keyup --window "$WINDOW" "$direction"
+  xdotool keyup --window "$WINDOW" s
+  xdotool keyup --window "$WINDOW" a
+}
+last_outcome() {
+  python3 - "$OUT/runtime-probe.csv" <<'CHECKOUTCOME'
+import csv,sys
+with open(sys.argv[1],newline='') as f:
+    rows=list(csv.DictReader(f))
+print(rows[-1]['last_outcome'])
+CHECKOUTCOME
+}
+chord_with_direction Up
+sleep 2; snap 15-victory-debug-entry
+sample victory-start
+if [ "$(last_outcome)" != "0" ]; then echo "Victory debug entry failed" >&2; exit 1; fi
+key x
+sleep 1
+key z
+sleep 1
+key s
+sleep 1
+for attempt in 1 2 3 4 5; do
+  key x
+  sleep 1
+  sample "victory-attack-$attempt"
+  if [ "$(last_outcome)" = 1 ]; then break; fi
+  # A missed attack is still a legal D20 roll. Advance shared initiative,
+  # command the Pokemon on its next ready trainer turn and retry.
+  key z
+  key z
+  key s
+done
+test "$(last_outcome)" = 1 || { echo "Native Rocket victory never resolved" >&2; exit 1; }
+sleep 1; snap 16-victory-result
+sample victory-result
+key x
+sleep 1; snap 17-victory-confirmed
+sample victory-confirmed
+key Right
+sleep 2; snap 18-victory-returned-field
+sample victory-resumed
+
+chord_with_direction Down
+sleep 2; snap 19-defeat-debug-entry
+sample defeat-start
+test "$(last_outcome)" = 0 || { echo "Native defeat entry failed" >&2; exit 1; }
+for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  key z
+  sleep 1
+  sample "defeat-turn-$attempt"
+  if [ "$(last_outcome)" = 2 ]; then break; fi
+done
+test "$(last_outcome)" = 2 || { echo "Native trainer defeat never resolved" >&2; exit 1; }
+sleep 1; snap 20-defeat-result
+sample defeat-result
+key x
+sleep 1; snap 21-defeat-confirmed
+sample defeat-confirmed
+key Right
+sleep 2; snap 22-defeat-returned-field
+sample defeat-resumed
+python3 integration/emerald/validate_outcome_replay.py "$OUT/runtime-probe.csv" "$OUT"
 # Preserve the exact ROM identity and reproducible input sequence alongside frames.
 # A replay of a stale ROM cannot establish acceptance of the current source HEAD.
 sha256sum "$ROM" | awk '{print $1}' > "$OUT/rom-sha256.txt"
@@ -121,7 +199,13 @@ One field encounter: L+R+START at frame 06.
 A deploys Pikachu, B advances the shared initiative, R commands via a
 trainer Bonus Action, A attempts Thunderbolt, B reselects trainer, B ends
 the shared turn, SELECT cancels, Right checks ordinary field movement.
-Every action has a distinct real mGBA frame and live EWRAM milestone.
+Then UP+L+R+START starts a low-HP Rocket victory scenario. A still
+requires a real D20 hit and engine outcome, with B/R turn/command retries
+only on actual misses. A confirms the result; Right restores field input.
+DOWN+L+R+START starts a vulnerable-trainer defeat scenario. B advances
+real Rocket AI turns; engine damage must KO the human. A confirms defeat;
+Right must restore native Emerald movement. Both endings have real EWRAM
+result/HP/acknowledgement/readback and distinct LCD frames.
 No gameplay acceptance is inferred from screenshots or inputs alone.
 EOF
 # Require actual live memory observations from the same mGBA process.
