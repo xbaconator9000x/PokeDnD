@@ -20,6 +20,7 @@
 #include "field_player_avatar.h"
 #include "fieldmap.h"
 #include "main.h"
+#include "sprite.h"
 #include "script.h"
 #include "constants/event_objects.h"
 #include "constants/event_object_movement.h"
@@ -60,6 +61,17 @@ EWRAM_DATA volatile u32 gPokeDnDLastOutcome;
 EWRAM_DATA volatile u32 gPokeDnDLastHumanHp;
 EWRAM_DATA volatile u32 gPokeDnDLastEnemyHp;
 EWRAM_DATA volatile u32 gPokeDnDOutcomeAcks;
+/* Native display-only hit reaction evidence; never substitute for damage. */
+EWRAM_DATA volatile u32 gPokeDnDImpactStarts;
+EWRAM_DATA volatile u32 gPokeDnDImpactFrames;
+static EWRAM_DATA u8 sImpactObjectId;
+static EWRAM_DATA u8 sImpactSpriteId;
+static EWRAM_DATA u8 sImpactLocalId;
+static EWRAM_DATA u8 sImpactMapGroup;
+static EWRAM_DATA u8 sImpactMapNum;
+static EWRAM_DATA u8 sImpactRemaining;
+static EWRAM_DATA bool8 sImpactCritical;
+static EWRAM_DATA s16 sImpactBaseX2;
 static EWRAM_DATA bool8 sResultShown;
 static EWRAM_DATA bool8 sWatchPostCancelMove;
 static EWRAM_DATA bool8 sSawPostCancelDpad;
@@ -81,6 +93,83 @@ static EWRAM_DATA s16 sEntryY;
 static EWRAM_DATA bool8 sFrozenByD20[OBJECT_EVENTS_COUNT];
 static EWRAM_DATA u8 sFrozenLocalId[OBJECT_EVENTS_COUNT];
 
+/* A lightweight physical shake of the *existing* Emerald actor sprite.
+ * Verify both the object-event identity and its sprite binding every frame,
+ * since map warps and unrelated scripts can recycle either slot. */
+static struct Sprite *GetImpactSprite(void)
+{
+    struct ObjectEvent *obj;
+    if (!sImpactRemaining || sImpactObjectId >= OBJECT_EVENTS_COUNT)
+        return NULL;
+    obj = &gObjectEvents[sImpactObjectId];
+    if (!obj->active || obj->localId != sImpactLocalId ||
+        obj->mapGroup != sImpactMapGroup ||
+        obj->mapNum != sImpactMapNum ||
+        obj->spriteId != sImpactSpriteId ||
+        sImpactSpriteId >= MAX_SPRITES || !gSprites[sImpactSpriteId].inUse)
+        return NULL;
+    return &gSprites[sImpactSpriteId];
+}
+static void EndImpact(void)
+{
+    struct Sprite *sprite = GetImpactSprite();
+    if (sprite)
+        sprite->x2 = sImpactBaseX2;
+    sImpactRemaining = 0;
+}
+static void TickImpact(void)
+{
+    /* 32 native frames, 8-frame oscillation, with no extra assets or DMA. */
+    static const s8 sOffsets[] = { 0, 1, 3, 1, 0, -1, -3, -1 };
+    struct Sprite *sprite = GetImpactSprite();
+    s16 offset;
+    if (!sImpactRemaining)
+        return;
+    if (!sprite) {
+        sImpactRemaining = 0;
+        return;
+    }
+    offset = sOffsets[(32 - sImpactRemaining) % ARRAY_COUNT(sOffsets)];
+    if (sImpactCritical)
+        offset *= 2;
+    sprite->x2 = sImpactBaseX2 + offset;
+    if (offset)
+        gPokeDnDImpactFrames++;
+    if (--sImpactRemaining == 0)
+        sprite->x2 = sImpactBaseX2;
+}
+static void StartImpact(int target, D20Attack attack)
+{
+    struct ObjectEvent *obj;
+    u8 objectId;
+    if (!attack.legal || !attack.hit || attack.damage <= 0)
+        return;
+    EndImpact();
+    if (target == sUnits.human)
+        objectId = gPlayerAvatar.objectEventId;
+    else if (target == sUnits.pokemon)
+        objectId = sPikachuObjectId;
+    else if (target == sUnits.enemy)
+        objectId = sRocketObjectId;
+    else
+        return;
+    if (objectId >= OBJECT_EVENTS_COUNT)
+        return;
+    obj = &gObjectEvents[objectId];
+    if (!obj->active || obj->spriteId >= MAX_SPRITES ||
+        !gSprites[obj->spriteId].inUse ||
+        obj->mapGroup != sMapGroup || obj->mapNum != sMapNum)
+        return;
+    sImpactObjectId = objectId;
+    sImpactSpriteId = obj->spriteId;
+    sImpactLocalId = obj->localId;
+    sImpactMapGroup = obj->mapGroup;
+    sImpactMapNum = obj->mapNum;
+    sImpactBaseX2 = gSprites[obj->spriteId].x2;
+    sImpactCritical = attack.crit;
+    sImpactRemaining = 32;
+    gPokeDnDImpactStarts++;
+}
 static int AbsCoord(int a) { return a < 0 ? -a : a; }
 static int DistanceTo(int a, int b)
 {
@@ -118,6 +207,7 @@ static void FreezeSurroundingActors(void)
 }
 static void CleanupCombat(bool8 restorePlayer)
 {
+    EndImpact();
     /* Combat may end after a warp has reset the BG0 window heap. */
     if (sMapGroup == gSaveBlock1Ptr->location.mapGroup &&
         sMapNum == gSaveBlock1Ptr->location.mapNum)
@@ -227,6 +317,9 @@ static bool StartCombat(u8 scenario)
     gPokeDnDMilestones = 0;
     gPokeDnDStartFailure = 0;
     gPokeDnDLastOutcome = FIGHTING;
+    gPokeDnDImpactStarts = 0;
+    gPokeDnDImpactFrames = 0;
+    sImpactRemaining = 0;
     gPokeDnDLastHumanHp = 0;
     gPokeDnDLastEnemyHp = 0;
     sResultShown = FALSE;
@@ -433,8 +526,10 @@ static void EnemyPhase(void)
     }
     if (DistanceTo(sUnits.enemy,target) == 1) {
         D20Attack result = d20_attack(&sBattle,sUnits.enemy,target,TACKLE);
-        if (result.legal)
+        if (result.legal) {
             PokeDnD_HudAttack(COMPOUND_STRING("ROCKET TACKLE"), result);
+            StartImpact(target, result);
+        }
     }
     if (sBattle.outcome == FIGHTING)
         (void)d20_next(&sBattle);
@@ -505,6 +600,8 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
         CleanupCombat(FALSE);
         return FALSE;
     }
+    /* Field callback runs every native frame, even with no new keypress. */
+    TickImpact();
     /* A result remains on screen until a separate A/START/B press.
      * A KO caused by an input on this frame cannot auto-dismiss itself. */
     if (sResultShown) {
@@ -554,6 +651,7 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
             if (newKeys & START_BUTTON) {
                 D20Attack result = d20_attack(&sBattle,sUnits.human,sUnits.enemy,TACKLE);
                 PokeDnD_HudAttack(COMPOUND_STRING("HUMAN TACKLE"), result);
+                StartImpact(sUnits.enemy, result);
             }
         } else {
             D20Attack result = {0};
@@ -565,8 +663,10 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
                 PokeDnD_HudAttack((newKeys & A_BUTTON)
                                     ? COMPOUND_STRING("PIKA THUNDERBOLT")
                                     : COMPOUND_STRING("PIKA QUICK ATTACK"), result);
-            if (result.legal)
+            if (result.legal) {
                 gPokeDnDMilestones |= 64u;
+                StartImpact(sUnits.enemy, result);
+            }
         }
         if ((newKeys & B_BUTTON) && sBattle.outcome == FIGHTING) {
             if (id == sUnits.pokemon) {
