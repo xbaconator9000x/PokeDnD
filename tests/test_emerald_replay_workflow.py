@@ -50,6 +50,16 @@ class ReplayWorkflowTests(unittest.TestCase):
         self.assertIn("(cancelled[2] & 255) == 239", script)
         self.assertNotIn("passed = any(t > 0 and f == 0 and (m & 7) == 7", script)
 
+    def test_debug_replay_evidence_only_after_live_validation(self):
+        script = (ROOT / "integration/emerald/ci_field_replay.sh").read_text()
+        verdict = script.index("python3 integration/emerald/validate_outcome_replay.py")
+        standard = script.index('"runtime-probe-verdict.txt").write_text(')
+        evidence = script.index("NATIVE_DEBUG_REPLAY_ACCEPTED.txt")
+        self.assertLess(verdict, evidence)
+        self.assertLess(standard, evidence)
+        self.assertNotIn("ACCEPTANCE_NOT_VERIFIED.txt", script)
+        self.assertIn("do NOT establish natural NPC/wild encounter activation", script)
+
     def test_upstream_pin_matches_native_build(self):
         self.assertIn(PIN, INTEGRATION.read_text())
 
