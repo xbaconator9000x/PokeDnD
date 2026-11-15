@@ -32,6 +32,15 @@ class ReplayWorkflowTests(unittest.TestCase):
         self.assertIn('"src/d20*"', text)
         self.assertIn('"include/d20*"', text)
 
+    def test_runtime_probe_requires_ordered_transitions(self):
+        script = (ROOT / "integration/emerald/ci_field_replay.sh").read_text()
+        self.assertIn("len(observed) < 3", script)
+        self.assertIn("runtime trigger count regressed", script)
+        self.assertIn("runtime milestones regressed", script)
+        self.assertIn("any((m & 7) == 1", script)
+        self.assertIn("any((m & 7) == 3", script)
+        self.assertNotIn("passed = any(t > 0 and f == 0 and (m & 7) == 7", script)
+
     def test_upstream_pin_matches_native_build(self):
         self.assertIn(PIN, INTEGRATION.read_text())
 
