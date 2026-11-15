@@ -28,11 +28,13 @@ def validate(rows):
     # Accept only its known, ordered labels and exclude it from the outcome
     # checkpoint validator; unknown labels still fail closed.
     labels_all = [row["label"] for row in rows]
+    legacy_labels = tuple(label for label in standard_labels if label != "dashed")
     standard = [label for label in labels_all if label in standard_labels]
-    if standard and (standard != list(standard_labels) or
-                     labels_all[:len(standard_labels)] != list(standard_labels)):
-        raise ValueError("standard native encounter checkpoints out of order")
-    rows = rows[len(standard_labels):] if standard else rows
+    if standard:
+        if (tuple(standard) not in (standard_labels, legacy_labels) or
+                labels_all[:len(standard)] != standard):
+            raise ValueError("standard native encounter checkpoints out of order")
+        rows = rows[len(standard):]
     parsed = []
     for row in rows:
         sample = {"label": row["label"]}
