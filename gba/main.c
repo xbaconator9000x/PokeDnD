@@ -114,6 +114,11 @@ static void draw(void)
             fill(sx,sy,TILE-1,1,RGB(31,31,31)); fill(sx,sy,1,TILE-1,RGB(31,31,31));
         }
     }
+    /* Upper-right real-hardware action indicator: green means Pokémon
+     * has a commanded action available, red means that action was spent.
+     * It is rendered from the same D20 state used by attack acceptance. */
+    if(actor==pikachu)
+        fill(227,2,9,9,battle.units[pikachu].action?RGB(7,25,6):RGB(25,6,6));
     fill(0,136,SCREEN_W,24,RGB(3,5,9));
     if(battle.outcome==ALLIES_WIN) label(6,139,"VICTORY SELECT RESET",RGB(28,31,15));
     else if(battle.outcome==ENEMIES_WIN) label(6,139,"DEFEAT SELECT RESET",RGB(31,12,12));
