@@ -56,11 +56,19 @@ Host GCC/Clang/sanitizer and portable map projection tests run through
 integration, cross-compiles and checks actual linked ARM ELF symbols, then
 boots the ROM in mGBA.
 
-`integration/emerald/ci_field_replay.sh` captures startup/title/quickstart/
-field candidate frames on a real mGBA SDL frontend. The standalone replay
-workflow uses previously built private run `43583355204` for rapid
-diagnostics, not always the latest exact HEAD. Title/splash/Birch intro
-screenshots are **not** gameplay acceptance.
+`integration/emerald/ci_field_replay.sh` captures genuine mGBA SDL frames
+from an **exact-HEAD source build**, not a stale ROM artifact. Emerald's native
+SELECT quickstart normally skips Birch's introduction but still starts inside
+the moving truck; repeatedly pressing SELECT cannot bypass that map script.
+Only the replay workflow uses `apply.py upstream --field-replay`, which
+fail-closed patches the exact pinned `WarpToTruck` source to spawn outdoors
+at Oldale Town (10, 12), clear of scripted trigger coordinates and NPCs.
+Normal adapter builds preserve Emerald's original new-game warp.
+
+The replay workflow runs Python regression tests for the default and replay
+boot paths, rejects changed source anchors, and retains diagnostic captures.
+**Screenshots, a successful source build or a green mGBA replay do not
+establish tactical gameplay acceptance** without live EWRAM transitions.
 
 Required next proof: trigger the Rocket encounter on a live Emerald map,
 send out Pikachu, act with both combatants, resolve an attack, cancel or win,
