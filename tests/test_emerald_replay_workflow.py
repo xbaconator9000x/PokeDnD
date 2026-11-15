@@ -67,6 +67,16 @@ class ReplayWorkflowTests(unittest.TestCase):
         self.assertNotIn("return StartCombat(scenario);", source)
         self.assertIn("return TRUE;", source.split("(void)StartCombat(scenario);", 1)[1].split("return FALSE;", 1)[0])
 
+    def test_rocket_field_interaction_is_native_and_safe(self):
+        source = (ROOT / "integration/emerald/pokednd_overworld.c").read_text()
+        self.assertIn("TryRocketFieldEncounter(newKeys)", source)
+        self.assertIn("obj->graphicsId != OBJ_EVENT_GFX_ROCKET_M", source)
+        self.assertIn("obj->localId == D20_ROCKET_LOCAL_ID", source)
+        self.assertIn("AbsCoord(obj->currentCoords.x - player.x)", source)
+        self.assertIn("AbsCoord(obj->currentCoords.y - player.y)", source)
+        self.assertIn("if (StartCombat(D20_SCENARIO_STANDARD))", source)
+        self.assertIn("return FALSE;\n    }\n    return FALSE;\n}\nbool8 PokeDnD_HandleOverworldInput", source)
+
     def test_upstream_pin_matches_native_build(self):
         self.assertIn(PIN, INTEGRATION.read_text())
 
