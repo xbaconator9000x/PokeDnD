@@ -92,10 +92,9 @@ class OutcomeReplayTests(unittest.TestCase):
         rows[1], rows[5] = rows[5], rows[1]
         self.assertRaisesRegex(ValueError, "out of order", outcomes.validate, rows)
         rows = good_trace()
-        rows.insert(1, rows[1].copy())
+        rows.insert(1, rows[0].copy())
         self.assertRaisesRegex(ValueError, "exactly one checkpoint",
-                               outcomes.validate,
-                               rows + [rows[2].copy() if False else rows[0].copy()])
+                               outcomes.validate, rows)
 
     def test_missing_register_rejected(self):
         rows = good_trace()
