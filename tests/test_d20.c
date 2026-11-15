@@ -355,8 +355,35 @@ static void test_speed_tiles_and_dash(void)
     CHECK(b.units[h].movement==12);
 }
 
+static void test_dash_cannot_bypass_terrain_or_actor_ownership(void)
+{
+    D20Battle b; int h,p,e;
+    setup(&b,&h,&p,&e);
+    CHECK(seek(&b,h));
+    CHECK(!d20_dash(&b,e)); /* Enemy cannot spend another actor's Action. */
+    CHECK(!d20_dash(&b,p)); /* Stowed Pokemon has no turn. */
+    CHECK(d20_wall(&b,2,4,true));
+    CHECK(d20_dash(&b,h));
+    CHECK(b.units[h].movement==12);
+    CHECK(!d20_walk(&b,h,2,4));
+    CHECK(!d20_walk(&b,h,5,4)); /* Occupied by Rocket. */
+    CHECK(d20_walk(&b,h,1,9)); /* Five legal orthogonal steps. */
+    CHECK(b.units[h].movement==7);
+    CHECK(!d20_dash(&b,h)); /* No second Action. */
+    CHECK(next_time(&b,h));
+    CHECK(b.units[h].movement==6);
+    CHECK(d20_deploy(&b,h,p,2,9));
+    CHECK(next_time(&b,h));
+    CHECK(d20_command(&b,h,p,true));
+    CHECK(d20_dash(&b,p)); /* Commanded Pokemon can Dash with its own Action. */
+    CHECK(b.units[p].movement==12 && b.units[p].action==0);
+    CHECK(!d20_attack(&b,p,e,THUNDERBOLT).legal);
+    CHECK(!d20_dash(&b,p));
+}
+
 int main(void)
 {
+    test_dash_cannot_bypass_terrain_or_actor_ownership();
     test_speed_tiles_and_dash();
     test_ability_and_dice();
     test_party_limits();
