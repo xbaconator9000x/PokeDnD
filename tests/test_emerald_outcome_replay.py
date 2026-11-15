@@ -57,6 +57,24 @@ class OutcomeReplayTests(unittest.TestCase):
         rows[0]["impact_starts"] = "1"
         self.assertRaisesRegex(ValueError, "before an attack", outcomes.validate, rows)
 
+    def test_terminal_damage_must_be_observed_at_input_checkpoint(self):
+        rows = good_trace()
+        rows[1]["last_outcome"] = "0"
+        rows[1]["last_enemy_hp"] = "1"
+        self.assertRaisesRegex(ValueError, "terminal damage at input checkpoint",
+                               outcomes.validate, rows)
+        rows = good_trace()
+        rows[6]["last_outcome"] = "0"
+        rows[6]["last_human_hp"] = "1"
+        self.assertRaisesRegex(ValueError, "terminal damage at input checkpoint",
+                               outcomes.validate, rows)
+
+    def test_intermediate_conflicting_outcome_rejected(self):
+        rows = good_trace()
+        rows[1]["last_outcome"] = "2"
+        self.assertRaisesRegex(ValueError, "terminal damage at input checkpoint",
+                               outcomes.validate, rows)
+
     def test_missing_damage_rejected(self):
         rows = good_trace()
         rows[2]["last_enemy_hp"] = "1"
