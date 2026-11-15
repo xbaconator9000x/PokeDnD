@@ -560,6 +560,34 @@ static void MoveSelected(u16 newKeys)
     if (d20_walk(&sBattle,id,x,y))
         MoveVisual(id);
 }
+/* Native field interaction prototype: pressing A next to an existing
+ * Rocket actor opens the tactical encounter without the debug chord.
+ * Only the original map actor is inspected; spawned debug actors are excluded.
+ * A failed admission yields to the normal Emerald interaction. */
+static bool8 TryRocketFieldEncounter(u16 newKeys)
+{
+    struct MapPosition player;
+    if (!(newKeys & A_BUTTON) || ArePlayerFieldControlsLocked())
+        return FALSE;
+    GetPlayerPosition(&player);
+    for (int i = 0; i < OBJECT_EVENTS_COUNT; i++) {
+        const struct ObjectEvent *obj = &gObjectEvents[i];
+        if (!obj->active || obj->isPlayer ||
+            obj->graphicsId != OBJ_EVENT_GFX_ROCKET_M ||
+            obj->localId == D20_ROCKET_LOCAL_ID ||
+            obj->mapGroup != gSaveBlock1Ptr->location.mapGroup ||
+            obj->mapNum != gSaveBlock1Ptr->location.mapNum ||
+            AbsCoord(obj->currentCoords.x - player.x) +
+            AbsCoord(obj->currentCoords.y - player.y) != 1)
+            continue;
+        if (StartCombat(D20_SCENARIO_STANDARD)) {
+            gPokeDnDTriggerCount++;
+            return TRUE;
+        }
+        return FALSE;
+    }
+    return FALSE;
+}
 bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
 {
     int id;
@@ -594,6 +622,8 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
             (void)StartCombat(scenario);
             return TRUE;
         }
+        if (TryRocketFieldEncounter(newKeys))
+            return TRUE;
         return FALSE;
     }
     /* Always yield to Emerald if the map changed unexpectedly. */
