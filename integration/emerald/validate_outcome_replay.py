@@ -21,6 +21,17 @@ def validate(rows):
         raise ValueError("no live EWRAM samples")
     if set(REQUIRED) - set(rows[0]):
         raise ValueError("missing native outcome or HP registers")
+    standard_labels = ("baseline", "started", "deployed", "turn",
+                       "commanded", "attacked", "cancelled", "resumed")
+    # The live debugger CSV contains the preceding standard encounter too.
+    # Accept only its known, ordered labels and exclude it from the outcome
+    # checkpoint validator; unknown labels still fail closed.
+    labels_all = [row["label"] for row in rows]
+    standard = [label for label in labels_all if label in standard_labels]
+    if standard and (standard != list(standard_labels) or
+                     labels_all[:len(standard_labels)] != list(standard_labels)):
+        raise ValueError("standard native encounter checkpoints out of order")
+    rows = rows[len(standard_labels):] if standard else rows
     parsed = []
     for row in rows:
         sample = {"label": row["label"]}
