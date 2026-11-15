@@ -29,6 +29,7 @@ TRUCK = ("SetWarpDestination(MAP_GROUP(MAP_INSIDE_OF_TRUCK), "
 class EmeraldFieldBootTests(TestCase):
     def make_upstream(self, path: Path, warp: str = TRUCK):
         (path / "src").mkdir()
+        (path / "include").mkdir()
         (path / "src/overworld.c").write_text(OVERWORLD)
         (path / "src/new_game.c").write_text(
             "static void WarpToTruck(void)\n"
