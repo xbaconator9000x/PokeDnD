@@ -108,7 +108,8 @@ bool d20_select(D20Battle *b, int actor)
 bool d20_command(D20Battle *b, int owner, int pokemon, bool spendBonus)
 {
     D20Unit *h, *p;
-    if (!b || d20_current(b) != owner || pokemon < 0 || pokemon >= b->count) return false;
+    if (!b || owner < 0 || owner >= b->count ||
+        d20_current(b) != owner || pokemon < 0 || pokemon >= b->count) return false;
     h = &b->units[owner]; p = &b->units[pokemon];
     if (h->role != HUMAN || h->hp <= 0 || p->role != POKEMON ||
         p->owner != owner || !p->deployed || p->hp <= 0 ||
@@ -156,7 +157,8 @@ bool d20_next(D20Battle *b)
 bool d20_deploy(D20Battle *b, int owner, int pokemon, int x, int y)
 {
     D20Unit *h, *p;
-    if (!b || d20_current(b) != owner || d20_actor(b) != owner ||
+    if (!b || owner < 0 || owner >= b->count ||
+        d20_current(b) != owner || d20_actor(b) != owner ||
         pokemon < 0 || pokemon >= b->count) return false;
     h = &b->units[owner]; p = &b->units[pokemon];
     if (h->role != HUMAN || h->hp <= 0 || !h->action || p->role != POKEMON || p->owner != owner ||
