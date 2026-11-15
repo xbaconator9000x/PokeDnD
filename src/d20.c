@@ -173,7 +173,8 @@ bool d20_walk(D20Battle *b, int actor, int x, int y)
     int distances[D20_W * D20_H], queue[D20_W * D20_H], head = 0, tail = 0, goal;
     const int dx[] = {1, -1, 0, 0}, dy[] = {0, 0, 1, -1};
     D20Unit *u;
-    if (!b || d20_actor(b) != actor || !inside(x, y)) return false;
+    if (!b || actor < 0 || actor >= b->count ||
+        d20_actor(b) != actor || !inside(x, y)) return false;
     u = &b->units[actor];
     if (!u->movement || !free_tile(b, x, y, actor) || (u->x == x && u->y == y)) return false;
     for (int i = 0; i < D20_W * D20_H; i++) distances[i] = -1;
@@ -232,7 +233,8 @@ D20Attack d20_attack(D20Battle *b, int actor, int target, D20Move move)
     D20Unit *a, *t;
     int range, roll, damage = 0, dice, sides;
     D20Stat stat;
-    if (!b || d20_actor(b) != actor || target < 0 || target >= b->count ||
+    if (!b || actor < 0 || actor >= b->count ||
+        d20_actor(b) != actor || target < 0 || target >= b->count ||
         move > SLEEP_POWDER) return result;
     a = &b->units[actor]; t = &b->units[target];
     if (!a->action || a->hp <= 0 || !t->deployed || t->hp <= 0 || a->team == t->team) return result;
