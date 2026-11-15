@@ -5,9 +5,10 @@ ROM="${1:?Usage: ci_field_replay.sh <ROM.gba> <evidence-directory>}"
 OUT="${2:?Output directory required}"
 mkdir -p "$OUT"
 export SDL_VIDEODRIVER=x11 SDL_AUDIODRIVER=dummy
-mgba "$ROM" >"$OUT/mgba.log" 2>&1 &
+mgba -g "$ROM" >"$OUT/mgba.log" 2>&1 &
 EMU=$!
-trap 'kill -9 "$EMU" 2>/dev/null || true' EXIT
+PROBE_PID=""
+trap 'if [ -n "$PROBE_PID" ]; then kill "$PROBE_PID" 2>/dev/null || true; fi; kill -9 "$EMU" 2>/dev/null || true' EXIT
 WINDOW=""
 for i in $(seq 1 20); do
   if ! kill -0 "$EMU" 2>/dev/null; then cat "$OUT/mgba.log"; exit 1; fi
@@ -17,6 +18,30 @@ for i in $(seq 1 20); do
 done
 test -n "$WINDOW" || { echo "No mGBA SDL window"; exit 1; }
 xdotool windowfocus "$WINDOW" || true
+# Unlike ELF address extraction or screenshots, these are actual GBA bus reads
+# while the same mGBA process is running. Require a working debugger or fail.
+POKEDND_ELF="${POKEDND_ELF:?Exact-head linked Emerald ELF required for live EWRAM sampling}"
+python3 integration/emerald/mgba_ewram_probe.py serve \
+  --elf "$POKEDND_ELF" --out "$OUT" >"$OUT/ewram-probe.log" 2>&1 &
+PROBE_PID=$!
+for i in $(seq 1 80); do
+  if [ -f "$OUT/ewram-probe-ready.txt" ]; then break; fi
+  if ! kill -0 "$PROBE_PID" 2>/dev/null; then
+    echo "Native EWRAM probe failed during startup" >&2
+    tail -n 12 "$OUT/ewram-probe.log" >&2
+    exit 1
+  fi
+  sleep 0.25
+done
+test -f "$OUT/ewram-probe-ready.txt" || {
+  echo "Timed out connecting to mGBA GDB stub" >&2
+  tail -n 12 "$OUT/ewram-probe.log" >&2
+  exit 1
+}
+sample() {
+  python3 integration/emerald/mgba_ewram_probe.py sample --out "$OUT" --label "$1"
+}
+POKEDND_RUNTIME_PROBE="$OUT/runtime-probe.csv"
 snap() {
   local name="$1"
   timeout 6s xwd -silent -id "$WINDOW" | convert xwd:- "$OUT/$name.png"
@@ -51,6 +76,7 @@ for k in Left Left Down Down Right Down; do
   key "$k"; sleep 1
 done
 sleep 2; snap 05-after-movement
+sample baseline
 # mGBA SDL default: L=A, R=S, START=Return, Pokémon A=X, B=Z.
 xdotool keydown --window "$WINDOW" a
 xdotool keydown --window "$WINDOW" s
@@ -58,10 +84,13 @@ key Return
 xdotool keyup --window "$WINDOW" s
 xdotool keyup --window "$WINDOW" a
 sleep 2; snap 06-after-combat-chord
+sample started
 key x
 sleep 2; snap 07-after-a-deployment
+sample deployed
 key z
 sleep 2; snap 08-after-b-turn
+sample turn
 # The previous test often reached a transitional mostly-black frame.
 # Continue recording instead of misreporting it as either success or failure.
 sleep 15; snap 09-transition-plus-15
@@ -96,6 +125,7 @@ key z
 sleep 2; snap 17c-end-shared-initiative
 key BackSpace
 sleep 2; snap 18-cancel-attempt
+sample cancelled
 # Preserve the exact ROM identity and reproducible input sequence alongside frames.
 # A replay of a stale ROM cannot establish acceptance of the current source HEAD.
 sha256sum "$ROM" | awk '{print $1}' > "$OUT/rom-sha256.txt"
@@ -108,10 +138,14 @@ A uses commanded Thunderbolt, B returns to trainer, B ends shared turn,
 SELECT cancellation. Commands on a scripted title screen are not proof.
 No gameplay acceptance is inferred from these inputs.
 EOF
-# Require an explicitly supplied emulator memory snapshot for gameplay acceptance.
-# A linked ELF or a screenshot alone is not a runtime observation.
-# Expected CSV columns: trigger_count,start_failure,milestones,diagnostic_state (integer or 0x hex).
+# Require actual live memory observations from the same mGBA process.
+# Expected CSV columns: trigger_count,start_failure,milestones,diagnostic_state.
+# Diagnostic screenshots are NEVER a substitute for this trace.
 # Milestones bit 0=start, bit 1=deploy, bit 2=turn.
+if [ ! -s "$POKEDND_RUNTIME_PROBE" ]; then
+  echo "FAIL: missing live EWRAM trace" >&2
+  exit 1
+fi
 if [ -n "${POKEDND_RUNTIME_PROBE:-}" ]; then
   python3 - "${POKEDND_RUNTIME_PROBE}" "$OUT" <<'PY'
 import csv, pathlib, sys
