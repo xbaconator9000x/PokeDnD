@@ -53,7 +53,7 @@ jobs:
         run: |
           ROM=$(find upstream -maxdepth 1 -type f -name '*.gba' | head -n 1)
           test -s "$ROM"
-          POKEDND_ELF=upstream/pokeemerald.elf timeout 245s xvfb-run -a -s "-screen 0 800x600x24" \
+          POKEDND_ELF=upstream/pokeemerald.elf timeout 180s xvfb-run -a -s "-screen 0 800x600x24" \
             bash integration/emerald/ci_field_replay.sh "$ROM" evidence
       - name: Retain emulator evidence
         if: always()
