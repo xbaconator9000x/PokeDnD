@@ -12,7 +12,7 @@ import shutil
 PIN = "4da9230cf7c1f1d7b0d47b45783b202666fffece"
 SOURCE = Path(__file__).resolve().parents[2]
 
-def install(upstream: Path, *, check_only: bool = False):
+def install(upstream: Path, *, check_only: bool = False, field_replay: bool = False):
     upstream = upstream.resolve()
     sha = subprocess.check_output(["git", "-C", str(upstream),
                                    "rev-parse", "HEAD"], text=True).strip()
@@ -50,9 +50,29 @@ def install(upstream: Path, *, check_only: bool = False):
             raise RuntimeError(f"Missing own integration source: {origin}")
         if dest.exists():
             raise RuntimeError(f"Destination exists; refusing overwrite: {dest}")
+    # Native upstream quickstart skips Birch's introduction but starts in the
+    # moving truck. For automated combat replay only, use a deterministic
+    # outdoor spawn clear of Oldale's warps, trigger tiles and fixed NPCs.
+    # Normal integration deliberately retains the original truck start.
+    replay_target = upstream / "src/new_game.c"
+    replay_original = None
+    replay_modified = None
+    if field_replay:
+        if not replay_target.is_file():
+            raise RuntimeError("Missing pinned upstream new-game source")
+        replay_original = replay_target.read_text(encoding="utf-8")
+        original_warp = ("SetWarpDestination(MAP_GROUP(MAP_INSIDE_OF_TRUCK), "
+                         "MAP_NUM(MAP_INSIDE_OF_TRUCK), WARP_ID_NONE, -1, -1);")
+        replay_warp = ("SetWarpDestination(MAP_GROUP(MAP_OLDALE_TOWN), "
+                       "MAP_NUM(MAP_OLDALE_TOWN), WARP_ID_NONE, 10, 12);")
+        if replay_original.count(original_warp) != 1:
+            raise RuntimeError("Pinned truck start changed; refusing replay field warp")
+        replay_modified = replay_original.replace(original_warp, replay_warp, 1)
     if check_only:
-        print("PASS: upstream SHA and hook anchors verified")
+        print("PASS: upstream SHA, hook anchors and replay warp verified")
         return
+    if field_replay:
+        replay_target.write_text(replay_modified, encoding="utf-8")
     target.write_text(content.replace(include_anchor, include_replacement, 1)
                               .replace(anchor, modified, 1), encoding="utf-8")
     for dest, origin in target_files.items():
@@ -63,5 +83,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("upstream", type=Path)
     parser.add_argument("--check-only", action="store_true")
+    parser.add_argument("--field-replay", action="store_true",
+                        help="CI-only: start outdoors in Oldale Town instead of the moving truck")
     args = parser.parse_args()
-    install(args.upstream, check_only=args.check_only)
+    install(args.upstream, check_only=args.check_only,
+            field_replay=args.field_replay)
