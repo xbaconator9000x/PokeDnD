@@ -37,7 +37,8 @@ jobs:
           COMPARE: 0
           UNUSED_ERROR: 1
         run: |
-          python3 integration/emerald/apply.py upstream
+          python3 integration/emerald/apply.py upstream --field-replay
+          grep -q 'SetWarpDestination(MAP_GROUP(MAP_OLDALE_TOWN)' upstream/src/new_game.c
           make -C upstream -j4 all
           test -s upstream/pokeemerald.elf
           arm-none-eabi-nm upstream/pokeemerald.elf | grep ' PokeDnD_HandleOverworldInput$'
