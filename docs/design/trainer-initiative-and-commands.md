@@ -1,6 +1,6 @@
 # Trainer-linked initiative and commands — proposed PokéDND rules
 
-Status: **agreed design direction / not yet implemented.** Source of direction: user design discussion, November 2026. These mechanics supersede the original separate-Pokémon-initiative POC approach when the next combat refactor is undertaken.
+Status: **implemented in the portable D20 core and integrated into both GBA input adapters; current exact-head emulator verification pending.** Source of direction: user design discussion, November 2026. These mechanics supersede the original separate-Pokémon-initiative POC approach when the next combat refactor is undertaken.
 
 ## Turns and initiative
 
@@ -27,12 +27,12 @@ The previously chosen POC rule remains a starting point: **sending out a Pokémo
 
 A Ranger and two Pokémon act on initiative 14. The Ranger spends a Bonus Action to command Pikachu to use Thunderbolt, then an Action to command Ivysaur to use Vine Whip. Both Pokémon are directly controlled during the Ranger's initiative group, using their own attack abilities and move effects. If the Ranger instead attacks with their Action and commands only Pikachu as a Bonus Action, Ivysaur Dodges.
 
-## Implementation migration plan
+## Implementation and verification status
 
 1. Preserve the tested portable C99 D20 core and stand-alone GBA POC as a baseline.
-2. Replace each Pokémon's separate initiative insertion with trainer-owned activation tied to owner ID. Add tests for 3 human groups / 2 Pokémon each, action/bonus-action exhaustion, one-command-per-Pokémon, automatic Dodge, and no free action immediately after deployment.
-3. Integrate those semantics into the Emerald overworld input hook and provide readable selection/turn indicators. Enemy Pokémon may use enemy trainer command grouping in future.
-4. Capture real mGBA evidence of a trainer commanding one Pokémon, commanding a second via the other resource, leaving one to Dodge, and surviving a new round.
+2. **Implemented in source:** Pokémon no longer enter initiative as independent entries. Trainer-owned selection and paid commands enforce Action/Bonus Action exhaustion, one command per Pokémon per trainer turn, automatic Dodge, no free action on deployment, and disadvantage for attacks targeting a Dodging Pokémon. Regression tests cover these behaviours.
+3. **Implemented in source:** the standalone GBA and Emerald hook both support Action/Bonus commands, switching from the commanded Pokémon back to trainer, and an attack. The GBA demo displays a Dodge marker and an action-ready/used indicator; richer native Emerald turn HUDs remain future work.
+4. **Testing underway:** host GCC/Clang/sanitizers, devkitARM GBA/Emerald builds, and real mGBA deployment→Bonus Action command→attack-state pixel verification. A genuine two-Pokémon-per-trainer emulator battle and all-native Emerald field combat remain outstanding.
 
 ## Related reference
 
