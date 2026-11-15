@@ -46,6 +46,14 @@ class RuntimeProbeExecutionTests(unittest.TestCase):
         self.assertEqual(status, 0)
         self.assertTrue(verdict.startswith("PASS"))
 
+    def test_missing_dash_checkpoint_rejected(self):
+        # A skipped Dash observation cannot be accepted as native input.
+        status, _ = run_trace([(0, 0, 0, 0, 0), (1, 0, 1, 1, 0),
+                               (1, 0, 3, 2, 0), (1, 0, 135, 3, 0),
+                               (1, 0, 167, 3, 0), (1, 0, 231, 3, 0),
+                               (1, 0, 239, 4, 0), (1, 0, 239, 4, 1)])
+        self.assertNotEqual(status, 0)
+
     def test_no_native_movement_after_cancel_rejected(self):
         trace = [(0, 0, 0, 0, 0), (1, 0, 1, 1, 0),
                  (1, 0, 3, 2, 0), (1, 0, 135, 3, 0),
