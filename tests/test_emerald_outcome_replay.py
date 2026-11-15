@@ -126,6 +126,24 @@ class OutcomeReplayTests(unittest.TestCase):
         self.assertRaisesRegex(ValueError, "regressed",
                                outcomes.validate, rows)
 
+    def test_attack_checkpoint_after_result_rejected(self):
+        rows = good_trace()
+        rows.insert(3, rows.pop(1))
+        self.assertRaisesRegex(ValueError, "outside encounter",
+                               outcomes.validate, rows)
+
+    def test_enemy_turn_before_defeat_start_rejected(self):
+        rows = good_trace()
+        rows.insert(5, rows.pop(6))
+        self.assertRaisesRegex(ValueError, "outside encounter",
+                               outcomes.validate, rows)
+
+    def test_unknown_native_checkpoint_rejected(self):
+        rows = good_trace()
+        rows.insert(2, dict(rows[1], label="victory-forged"))
+        self.assertRaisesRegex(ValueError, "unexpected native outcome checkpoint",
+                               outcomes.validate, rows)
+
     def test_missing_register_rejected(self):
         rows = good_trace()
         rows[0].pop("last_outcome")
