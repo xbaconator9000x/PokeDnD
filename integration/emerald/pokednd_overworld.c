@@ -694,17 +694,24 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
             }
         } else {
             D20Attack result = {0};
-            if (newKeys & A_BUTTON)
-                result = d20_attack(&sBattle,id,sUnits.enemy,THUNDERBOLT);
-            else if (newKeys & R_BUTTON)
-                result = d20_attack(&sBattle,id,sUnits.enemy,QUICK_ATTACK);
-            if (newKeys & (A_BUTTON | R_BUTTON))
-                PokeDnD_HudAttack((newKeys & A_BUTTON)
-                                    ? COMPOUND_STRING("PIKA THUNDERBOLT")
-                                    : COMPOUND_STRING("PIKA QUICK ATTACK"), result);
-            if (result.legal) {
-                gPokeDnDMilestones |= 64u;
-                StartImpact(sUnits.enemy, result);
+            /* A commanded Pokemon spends its own Action to Dash, not the
+             * trainer's already-paid command resource. */
+            if ((newKeys & START_BUTTON) && (heldKeys & L_BUTTON)) {
+                if (d20_dash(&sBattle, id))
+                    PokeDnD_HudMessage(COMPOUND_STRING("PIKA DASH +SPEED"));
+            } else {
+                if (newKeys & A_BUTTON)
+                    result = d20_attack(&sBattle,id,sUnits.enemy,THUNDERBOLT);
+                else if (newKeys & R_BUTTON)
+                    result = d20_attack(&sBattle,id,sUnits.enemy,QUICK_ATTACK);
+                if (newKeys & (A_BUTTON | R_BUTTON))
+                    PokeDnD_HudAttack((newKeys & A_BUTTON)
+                                        ? COMPOUND_STRING("PIKA THUNDERBOLT")
+                                        : COMPOUND_STRING("PIKA QUICK ATTACK"), result);
+                if (result.legal) {
+                    gPokeDnDMilestones |= 64u;
+                    StartImpact(sUnits.enemy, result);
+                }
             }
         }
         if ((newKeys & B_BUTTON) && sBattle.outcome == FIGHTING) {
