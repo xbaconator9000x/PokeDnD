@@ -1,5 +1,10 @@
 #include "d20.h"
 #include <string.h>
+uint8_t d20_speed_tiles(unsigned int feet)
+{
+    unsigned int tiles = feet / D20_FEET_PER_TILE;
+    return (uint8_t)(tiles > 255u ? 255u : tiles);
+}
 static int ab(int x) { return x < 0 ? -x : x; }
 static bool inside(int x, int y) { return x >= 0 && y >= 0 && x < D20_W && y < D20_H; }
 static bool occupied(const D20Battle *b, int x, int y, int except)
@@ -43,7 +48,7 @@ int d20_add(D20Battle *b, D20Role role, int owner, int x, int y, bool deployed)
     u->x = (int8_t)x; u->y = (int8_t)y; u->owner = (int8_t)owner;
     u->role = (uint8_t)role; u->team = role == ENEMY ? 1 : 0; u->deployed = deployed;
     u->hp = u->max_hp = role == HUMAN ? 24 : 18;
-    u->ac = role == ENEMY ? 12 : 13; u->speed = 6; u->proficiency = 2; u->ready_round = 1;
+    u->ac = role == ENEMY ? 12 : 13; u->speed = d20_speed_tiles(30); u->proficiency = 2; u->ready_round = 1;
     for (int a = 0; a < ABILITIES; a++) u->stats[a] = 10;
     return id;
 }
@@ -170,6 +175,19 @@ bool d20_deploy(D20Battle *b, int owner, int pokemon, int x, int y)
     p->ready_round = b->round + 1; /* No immediate attack after deployment. */
     p->initiative = h->initiative; /* Share the trainer initiative, no slot. */
     p->commanded = 0; p->dodging = 1;
+    return true;
+}
+bool d20_dash(D20Battle *b, int actor)
+{
+    D20Unit *u;
+    if (!b || actor < 0 || actor >= b->count || d20_actor(b) != actor)
+        return false;
+    u = &b->units[actor];
+    if (!u->deployed || u->hp <= 0 || !u->action ||
+        (unsigned int)u->movement + u->speed > 255u)
+        return false;
+    u->action = 0;
+    u->movement = (uint8_t)(u->movement + u->speed);
     return true;
 }
 bool d20_walk(D20Battle *b, int actor, int x, int y)
