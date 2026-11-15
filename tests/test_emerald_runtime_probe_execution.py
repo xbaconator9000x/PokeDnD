@@ -22,6 +22,8 @@ def validator_source():
 
 
 def run_trace(rows):
+    rows = [(*row, {0: 0, 1: 1, 3: 2, 7: 3}.get(row[2], 0))
+            if len(row) == 3 else row for row in rows]
     with tempfile.TemporaryDirectory() as temp:
         folder = pathlib.Path(temp)
         csv = folder / "trace.csv"
