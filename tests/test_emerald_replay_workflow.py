@@ -35,7 +35,10 @@ class ReplayWorkflowTests(unittest.TestCase):
 
     def test_runtime_probe_requires_ordered_transitions(self):
         script = (ROOT / "integration/emerald/ci_field_replay.sh").read_text()
-        self.assertIn("len(observed) < 7", script)
+        self.assertIn("len(observed) < 8", script)
+        self.assertIn("post_cancel_moves", script)
+        self.assertIn("resumed[4] == 1", script)
+        self.assertIn("gPokeDnDPostCancelMoves", script)
         self.assertIn("runtime trigger count regressed", script)
         self.assertIn("runtime milestones regressed", script)
         self.assertIn("started[3] == 1 and deployed[3] == 2 and turned[3] == 3", script)
