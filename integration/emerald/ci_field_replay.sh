@@ -121,7 +121,28 @@ for row in rows:
     if min(trigger, failure, bits) < 0:
         raise SystemExit("FAIL: negative runtime probe value")
     observed.append((trigger, failure, bits))
-passed = any(t > 0 and f == 0 and (m & 7) == 7 for t, f, m in observed)
+# A single synthetic or stale all-bits-set row is not a replay trace.
+# Require sequential emulator observations of activation, deployment and turn.
+# Trigger counts must never decrease and milestone bits must be monotonic.
+if len(observed) < 3:
+    raise SystemExit("FAIL: require at least three ordered runtime samples")
+for previous, current in zip(observed, observed[1:]):
+    if current[0] < previous[0]:
+        raise SystemExit("FAIL: runtime trigger count regressed")
+    if (current[2] & previous[2]) != previous[2]:
+        raise SystemExit("FAIL: runtime milestones regressed")
+started = deployed = passed = False
+for trigger, failure, bits in observed:
+    if trigger == 0 or failure != 0:
+        continue
+    if bits & 1:
+        started = True
+    if started and bits & 2:
+        deployed = True
+    if deployed and (bits & 7) == 7:
+        passed = True
+# An all-bits-set initial row is not evidence of observed transitions.
+passed = passed and any((m & 7) == 1 for _, _, m in observed) and any((m & 7) == 3 for _, _, m in observed)
 (out / "runtime-probe-verdict.txt").write_text(
     ("PASS" if passed else "FAIL") +
     ": observed native trigger, admission, deployment and turn milestones\\n"
