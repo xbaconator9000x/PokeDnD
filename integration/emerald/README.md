@@ -22,8 +22,10 @@ The portable C99 rules engine is compiled into actual Emerald and called by
   collision, existing object events and map boundaries.
 - Independent human / stowed Pikachu / Rocket test combatants, using existing
   `OBJ_EVENT_GFX_ROCKET_M` and `OBJ_EVENT_GFX_PIKACHU` sprites.
-- Initiative, movement and basic attacks. Pikachu deployment costs the human's
-  Action only after its sprite has successfully spawned.
+- Trainer-shared initiative, movement and basic attacks. Human spends an Action
+  or Bonus Action to command Pikachu; an uncommanded Pokémon automatically Dodges
+  and attack rolls against it have disadvantage. Pikachu deployment costs the
+  human's Action only after its sprite has successfully spawned.
 - Simple enemy turn; normal overworld input resumes after the encounter.
 - Existing NPCs are temporarily frozen and individually restored afterward.
 - SELECT cancellation restores the player's original tile; temporary sprites
@@ -35,9 +37,10 @@ The portable C99 rules engine is compiled into actual Emerald and called by
 | --- | --- |
 | D-pad | Move active friendly unit on the grid |
 | A | Human deploys Pikachu / Pikachu uses Thunderbolt |
-| L | Human uses Tackle |
-| R | Pikachu uses Quick Attack |
-| B | End current friendly turn |
+| L | Human spends Action to command Pikachu |
+| R | Human spends Bonus Action to command Pikachu; selected Pikachu uses Quick Attack |
+| START | Human uses Tackle (Action) |
+| B | Switch from selected Pikachu to trainer; trainer ends shared turn |
 | SELECT | Cancel and return player to original tile |
 
 **Unimplemented:** dedicated turn HUD, cover mechanics, complex AI, actual
