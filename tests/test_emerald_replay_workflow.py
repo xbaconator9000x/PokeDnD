@@ -72,8 +72,14 @@ class ReplayWorkflowTests(unittest.TestCase):
         self.assertIn("TryRocketFieldEncounter(newKeys)", source)
         self.assertIn("obj->graphicsId != OBJ_EVENT_GFX_ROCKET_M", source)
         self.assertIn("obj->localId == D20_ROCKET_LOCAL_ID", source)
-        self.assertIn("AbsCoord(obj->currentCoords.x - player.x)", source)
-        self.assertIn("AbsCoord(obj->currentCoords.y - player.y)", source)
+        # Only the object in the facing tile may intercept the A interaction.
+        # Side/rear Rockets must fall through to Emerald field handling.
+        self.assertIn("facing = GetPlayerFacingDirection();", source)
+        for direction in ("DIR_NORTH", "DIR_SOUTH", "DIR_WEST", "DIR_EAST"):
+            self.assertIn("facing == " + direction, source)
+        self.assertIn("obj->currentCoords.x != targetX", source)
+        self.assertIn("obj->currentCoords.y != targetY", source)
+        self.assertNotIn("AbsCoord(obj->currentCoords.x - player.x)", source)
         self.assertIn("if (StartCombat(D20_SCENARIO_STANDARD))", source)
         self.assertIn("return FALSE;\n    }\n    return FALSE;\n}\nbool8 PokeDnD_HandleOverworldInput", source)
 
