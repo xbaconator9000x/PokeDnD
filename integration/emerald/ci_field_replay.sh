@@ -242,9 +242,9 @@ xdotool keyup --window "$WINDOW" s
 xdotool keyup --window "$WINDOW" a
 sleep 1; snap 23-replay-rocket-fixture
 sample fixture-spawn
-# Native field control locks can outlive the 2-second post-defeat wait.
-# Retry only the fixture chord after a genuine idle interval; do not
-# reinterpret a locked admission as successful spawning.
+# Field locks can outlive post-defeat waits, and a recovered player can
+# face an occupied tile. Retry genuine field movement and recheck admission;
+# neither lock nor occupancy is evidence that a Rocket was spawned.
 for retry in 1 2 3 4; do
   status=$(python3 - "$OUT/runtime-probe.csv" <<'STATUS'
 import csv, sys
@@ -252,17 +252,24 @@ with open(sys.argv[1], newline="") as handle:
     print(list(csv.DictReader(handle))[-1]["replay_fixture_status"])
 STATUS
 )
-  if [ "$status" != "1" ]; then break; fi
-  # A field lock may be held by a lingering native menu/task after the
-  # result acknowledgement. Try ordinary B cancellation and a complete
-  # left/right walking cycle before retrying. Unlike an idle-only retry,
-  # this exercises Emerald's actual field-input recovery path. Keep each
-  # probe and LCD frame so an unsuccessful recovery remains diagnosable.
+  if [ "$status" != "1" ] && [ "$status" != "4" ]; then break; fi
+  # First clear any lingering UI/task with B. If the target is occupied,
+  # rotate to another adjacent tile rather than retrying the same NPC tile.
+  # Movement is sent to real mGBA and field-lock checks remain authoritative.
   key z
   sleep 1
-  key Left
-  sleep 1
-  key Right
+  if [ "$status" = "4" ]; then
+    case "$retry" in
+      1) key Up ;;
+      2) key Down ;;
+      3) key Left ;;
+      4) key Right ;;
+    esac
+  else
+    key Left
+    sleep 1
+    key Right
+  fi
   sleep 2
   snap "23a-field-recovery-$retry"
   sample "field-recovery-$retry"
