@@ -83,7 +83,7 @@ def install(upstream: Path, *, check_only: bool = False, field_replay: bool = Fa
         # Replay-only source flag. The ordinary adapter never injects an NPC.
         # This is a test fixture using the upstream's own Rocket graphics.
         actor = upstream / "src/pokednd_overworld.c"
-        actor.write_text("#define POKEDND_NATIVE_REPLAY_ROCKET 1\\n" +
+        actor.write_text("#define POKEDND_NATIVE_REPLAY_ROCKET 1\n" +
                          actor.read_text(encoding="utf-8"), encoding="utf-8")
     print("PASS: installed PokeDnD source adapter in pinned Emerald checkout")
 
