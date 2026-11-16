@@ -68,10 +68,28 @@ static void test_trapped(void)
     CHECK(!d20_field_spawn_demo(&b,&p,&e));
     CHECK(b.count==0);
 }
+static void test_existing_actor_encounter(void)
+{
+    D20Battle b; D20FieldProjection p; D20FieldEncounter e;
+    FakeMap f=open_map();
+    f.wallx=41; f.wally=25;
+    d20_init(&b,12);
+    CHECK(d20_field_project(&b,&p,40,25,blocked,&f));
+    CHECK(!d20_field_spawn_existing(&b,&p,&e,42,25));
+    CHECK(b.count==0);
+    CHECK(!d20_field_spawn_existing(&b,&p,&e,40,25));
+    CHECK(b.count==0);
+    CHECK(d20_field_spawn_existing(&b,&p,&e,41,25));
+    CHECK(b.count==3);
+    CHECK(b.units[e.enemy].x==6&&b.units[e.enemy].y==4);
+    CHECK(b.map[4][6]=='.');
+    CHECK(!d20_field_spawn_existing(&b,&p,&e,41,25));
+    CHECK(d20_start(&b));
+}
 int main(void)
 {
     test_world_projection();test_boundaries_and_fail_closed();
-    test_encounter();test_trapped();
-    printf("PASS: overworld map adapter (%d assertions, 4 scenarios)\n",checks);
+    test_encounter();test_trapped();test_existing_actor_encounter();
+    printf("PASS: overworld map adapter (%d assertions, 5 scenarios)\n",checks);
     return 0;
 }
