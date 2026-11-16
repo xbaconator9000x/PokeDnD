@@ -25,6 +25,7 @@ typedef struct {
     int8_t order[D20_MAX], cursor;
     int8_t selected; /* human/enemy turn owner, or commanded Pokemon */
     uint8_t count, order_count, started, outcome;
+    uint8_t max_trainers, max_pokemon_per_trainer; /* Campaign policy, not fixed rules. */
     uint16_t round;
     uint32_t rng;
 } D20Battle;
@@ -34,6 +35,8 @@ typedef struct {
     int second_roll; /* 0 normally; the second d20 when Dodge imposed disadvantage */
 } D20Attack;
 void d20_init(D20Battle *b, uint32_t seed);
+/* Set before adding actors; limits are validated against the current roster. */
+bool d20_party_limits(D20Battle *b, unsigned int trainers, unsigned int pokemon_per_trainer);
 int d20_add(D20Battle *b, D20Role role, int owner, int x, int y, bool deployed);
 bool d20_wall(D20Battle *b, int x, int y, bool blocked);
 int d20_mod(int ability_score);
