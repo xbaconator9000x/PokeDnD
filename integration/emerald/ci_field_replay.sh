@@ -253,7 +253,19 @@ with open(sys.argv[1], newline="") as handle:
 STATUS
 )
   if [ "$status" != "1" ]; then break; fi
-  sleep 3
+  # A field lock may be held by a lingering native menu/task after the
+  # result acknowledgement. Try ordinary B cancellation and a complete
+  # left/right walking cycle before retrying. Unlike an idle-only retry,
+  # this exercises Emerald's actual field-input recovery path. Keep each
+  # probe and LCD frame so an unsuccessful recovery remains diagnosable.
+  key z
+  sleep 1
+  key Left
+  sleep 1
+  key Right
+  sleep 2
+  snap "23a-field-recovery-$retry"
+  sample "field-recovery-$retry"
   xdotool keydown --window "$WINDOW" a
   xdotool keydown --window "$WINDOW" s
   xdotool keydown --window "$WINDOW" BackSpace
