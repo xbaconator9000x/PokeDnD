@@ -79,6 +79,22 @@ for k in Left Left Down Down Right Down; do
 done
 sleep 2; snap 05-after-movement
 sample baseline
+# Debug-only replay must never claim a natural Rocket encounter. Check the
+# *live* mGBA EWRAM values before and after the full debug sequence.
+assert_no_natural_encounter() {
+  python3 - "$OUT/runtime-probe.csv" <<'CHECKNATURAL'
+import csv, sys
+with open(sys.argv[1], newline="") as handle:
+    rows = list(csv.DictReader(handle))
+if not rows:
+    raise SystemExit("FAIL: missing native encounter telemetry")
+for row in rows:
+    if int(row["natural_encounter_count"]) != 0 or int(row["last_natural_local_id"]) != 0:
+        raise SystemExit("FAIL: debug replay incorrectly recorded a natural NPC encounter")
+print("PASS: debug replay has no false natural Rocket encounter attribution")
+CHECKNATURAL
+}
+assert_no_natural_encounter
 # mGBA SDL default: L=A, R=S, START=Return, Pokémon A=X, B=Z.
 xdotool keydown --window "$WINDOW" a
 xdotool keydown --window "$WINDOW" s
@@ -211,6 +227,7 @@ key Right
 sleep 2; snap 22-defeat-returned-field
 sample defeat-resumed
 python3 integration/emerald/validate_outcome_replay.py "$OUT/runtime-probe.csv" "$OUT"
+assert_no_natural_encounter
 # Preserve the exact ROM identity and reproducible input sequence alongside frames.
 # A replay of a stale ROM cannot establish acceptance of the current source HEAD.
 sha256sum "$ROM" | awk '{print $1}' > "$OUT/rom-sha256.txt"
