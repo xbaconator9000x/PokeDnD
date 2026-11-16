@@ -228,13 +228,18 @@ sleep 2; snap 22-defeat-returned-field
 sample defeat-resumed
 python3 integration/emerald/validate_outcome_replay.py "$OUT/runtime-probe.csv" "$OUT"
 assert_no_natural_encounter
-# Native source-only fixture: R+START places an upstream Rocket object
-# immediately in front of the player. Pressing A must enter combat through
-# the same ordinary facing-direction interaction as a map-authored NPC.
-# The fixture is explicitly not evidence of an authored Rocket map encounter.
+# Native source-only fixture: L+R+SELECT+START places an upstream Rocket
+# immediately in front of the player, using the same already exercised
+# L+R+START input path as debug encounters with SELECT as a fixture qualifier.
+# Pressing A then uses normal facing-direction NPC interaction.
+# This is not evidence of an authored Rocket map encounter.
+xdotool keydown --window "$WINDOW" a
 xdotool keydown --window "$WINDOW" s
+xdotool keydown --window "$WINDOW" BackSpace
 key Return
+xdotool keyup --window "$WINDOW" BackSpace
 xdotool keyup --window "$WINDOW" s
+xdotool keyup --window "$WINDOW" a
 sleep 1; snap 23-replay-rocket-fixture
 sample fixture-spawn
 python3 - "$OUT/runtime-probe.csv" <<'CHECKFIXTURE'
