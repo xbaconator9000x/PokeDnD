@@ -28,7 +28,7 @@ bool d20_party_limits(D20Battle *b, unsigned int trainers, unsigned int pokemon_
 {
     unsigned int humans = 0;
     if (!b || b->started || trainers == 0 || trainers > D20_MAX ||
-        pokemon_per_trainer > D20_MAX - 1) return false;
+        pokemon_per_trainer == 0 || pokemon_per_trainer > D20_MAX - 1) return false;
     for (int i = 0; i < b->count; i++) {
         if (b->units[i].role == HUMAN) {
             unsigned int owned = 0;
