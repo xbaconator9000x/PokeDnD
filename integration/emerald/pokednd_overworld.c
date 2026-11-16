@@ -247,20 +247,6 @@ static void CleanupCombat(bool8 restorePlayer)
         sMapNum == gSaveBlock1Ptr->location.mapNum &&
         gPlayerAvatar.objectEventId < OBJECT_EVENTS_COUNT)
         MoveObjectEventToMapCoords(&gObjectEvents[gPlayerAvatar.objectEventId], sEntryX, sEntryY);
-    if (sRocketIsExisting && sActive) {
-        if (sMapGroup != gSaveBlock1Ptr->location.mapGroup ||
-            sMapNum != gSaveBlock1Ptr->location.mapNum)
-            gPokeDnDNaturalCleanupStatus = 3;
-        else if (sRocketObjectId >= OBJECT_EVENTS_COUNT ||
-                 !gObjectEvents[sRocketObjectId].active ||
-                 gObjectEvents[sRocketObjectId].graphicsId != OBJ_EVENT_GFX_ROCKET_M ||
-                 gObjectEvents[sRocketObjectId].localId != sRocketOriginalLocalId ||
-                 gObjectEvents[sRocketObjectId].mapGroup != sMapGroup ||
-                 gObjectEvents[sRocketObjectId].mapNum != sMapNum)
-            gPokeDnDNaturalCleanupStatus = 2;
-        else
-            gPokeDnDNaturalCleanupStatus = 1;
-    }
     /* A natural encounter borrows the original NPC. Restore its tile and
      * preserve the actor, scripts and local ID; only debug sprites are ours. */
     if (sRocketIsExisting && sActive &&
@@ -274,6 +260,25 @@ static void CleanupCombat(bool8 restorePlayer)
         gObjectEvents[sRocketObjectId].mapNum == sMapNum)
         MoveObjectEventToMapCoords(&gObjectEvents[sRocketObjectId],
                                    sRocketOriginalX, sRocketOriginalY);
+    /* Sample after restoration: the live probe must prove that the original
+     * actor is still present on its starting tile, not merely that its slot
+     * was occupied before cleanup. */
+    if (sRocketIsExisting && sActive) {
+        if (sMapGroup != gSaveBlock1Ptr->location.mapGroup ||
+            sMapNum != gSaveBlock1Ptr->location.mapNum)
+            gPokeDnDNaturalCleanupStatus = 3;
+        else if (sRocketObjectId >= OBJECT_EVENTS_COUNT ||
+                 !gObjectEvents[sRocketObjectId].active ||
+                 gObjectEvents[sRocketObjectId].graphicsId != OBJ_EVENT_GFX_ROCKET_M ||
+                 gObjectEvents[sRocketObjectId].localId != sRocketOriginalLocalId ||
+                 gObjectEvents[sRocketObjectId].mapGroup != sMapGroup ||
+                 gObjectEvents[sRocketObjectId].mapNum != sMapNum ||
+                 gObjectEvents[sRocketObjectId].currentCoords.x != sRocketOriginalX ||
+                 gObjectEvents[sRocketObjectId].currentCoords.y != sRocketOriginalY)
+            gPokeDnDNaturalCleanupStatus = 2;
+        else
+            gPokeDnDNaturalCleanupStatus = 1;
+    }
     /* Object-event slots can be recycled after an unexpected map warp.
      * Never destroy a real map NPC merely because it reused our old slot. */
     if (!sRocketIsExisting && sRocketObjectId < OBJECT_EVENTS_COUNT &&
