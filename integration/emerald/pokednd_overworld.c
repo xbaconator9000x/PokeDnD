@@ -601,6 +601,41 @@ static void MoveSelected(u16 newKeys)
  * Rocket actor opens the tactical encounter without the debug chord.
  * Only the original map actor is inspected; spawned debug actors are excluded.
  * A failed admission yields to the normal Emerald interaction. */
+#ifdef POKEDND_NATIVE_REPLAY_ROCKET
+/* CI-only: create a real native object event on the tile the player faces.
+ * The fixture uses upstream Emerald graphics and normal A interaction; it
+ * is never compiled into the normal integration or committed as ROM data. */
+static bool8 SpawnReplayRocket(u16 newKeys, u16 heldKeys)
+{
+    struct MapPosition player;
+    s16 x, y;
+    u8 facing;
+    if (!(newKeys & SELECT_BUTTON) || !(heldKeys & R_BUTTON) ||
+        ArePlayerFieldControlsLocked())
+        return FALSE;
+    GetPlayerPosition(&player);
+    x = player.x;
+    y = player.y;
+    facing = GetPlayerFacingDirection();
+    if (facing == DIR_NORTH) y--;
+    else if (facing == DIR_SOUTH) y++;
+    else if (facing == DIR_WEST) x--;
+    else if (facing == DIR_EAST) x++;
+    else return TRUE;
+    if (!AreCoordsInsidePlayerMap(x, y) || MapGridGetCollisionAt(x, y))
+        return TRUE;
+    for (int i = 0; i < OBJECT_EVENTS_COUNT; i++) {
+        const struct ObjectEvent *obj = &gObjectEvents[i];
+        if (obj->active && obj->mapGroup == gSaveBlock1Ptr->location.mapGroup &&
+            obj->mapNum == gSaveBlock1Ptr->location.mapNum &&
+            obj->currentCoords.x == x && obj->currentCoords.y == y)
+            return TRUE;
+    }
+    (void)SpawnSpecialObjectEventParameterized(OBJ_EVENT_GFX_ROCKET_M,
+        MOVEMENT_TYPE_NONE, 230, x, y, player.elevation);
+    return TRUE;
+}
+#endif
 static bool8 TryRocketFieldEncounter(u16 newKeys)
 {
     struct MapPosition player;
@@ -652,6 +687,10 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
 {
     int id;
     if (!sActive) {
+#ifdef POKEDND_NATIVE_REPLAY_ROCKET
+        if (SpawnReplayRocket(newKeys, heldKeys))
+            return TRUE;
+#endif
         /* Observe the *real* engine's player tile after normal field input
          * has been restored. Require a new D-pad press first; changing map,
          * stepping during rollback or an idle camera animation cannot pass. */
