@@ -595,6 +595,10 @@ static bool8 TryRocketFieldEncounter(u16 newKeys)
             /* Never hijack a scripted/frozen actor or an NPC on another
              * elevation. Emerald must retain its ordinary interaction. */
             obj->frozen || obj->currentElevation != player.elevation ||
+            /* Moving actors may leave this tile before the engine processes
+             * A. Let Emerald handle them rather than starting a fight with
+             * an actor already walking away. */
+            obj->heldMovementActive || obj->singleMovementActive ||
             obj->currentCoords.x != targetX ||
             obj->currentCoords.y != targetY)
             continue;
