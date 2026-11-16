@@ -245,8 +245,12 @@ static void CleanupCombat(bool8 restorePlayer)
         MoveObjectEventToMapCoords(&gObjectEvents[gPlayerAvatar.objectEventId], sEntryX, sEntryY);
     /* A natural encounter borrows the original NPC. Restore its tile and
      * preserve the actor, scripts and local ID; only debug sprites are ours. */
-    if (sRocketIsExisting && sRocketObjectId < OBJECT_EVENTS_COUNT &&
+    if (sRocketIsExisting && sActive && restorePlayer &&
+        sMapGroup == gSaveBlock1Ptr->location.mapGroup &&
+        sMapNum == gSaveBlock1Ptr->location.mapNum &&
+        sRocketObjectId < OBJECT_EVENTS_COUNT &&
         gObjectEvents[sRocketObjectId].active &&
+        gObjectEvents[sRocketObjectId].graphicsId == OBJ_EVENT_GFX_ROCKET_M &&
         gObjectEvents[sRocketObjectId].localId == sRocketOriginalLocalId &&
         gObjectEvents[sRocketObjectId].mapGroup == sMapGroup &&
         gObjectEvents[sRocketObjectId].mapNum == sMapNum)
@@ -331,6 +335,16 @@ static bool StartCombat(u8 scenario, u8 existingRocketId)
     /* Avoid scripts, link rooms, active movement and accidental re-entry. */
     if (sActive)
         return false;
+    /* A natural encounter must still refer to the same live Rocket on the
+     * player's map. Never read a stale/recycled object slot. */
+    if (existingRocketId < OBJECT_EVENTS_COUNT) {
+        const struct ObjectEvent *rocket = &gObjectEvents[existingRocketId];
+        if (!rocket->active || rocket->isPlayer || rocket->invisible ||
+            rocket->graphicsId != OBJ_EVENT_GFX_ROCKET_M ||
+            rocket->mapGroup != gSaveBlock1Ptr->location.mapGroup ||
+            rocket->mapNum != gSaveBlock1Ptr->location.mapNum)
+            return false;
+    }
     sWatchPostCancelMove = FALSE;
     sSawPostCancelDpad = FALSE;
     gPokeDnDPostCancelMoves = 0;
