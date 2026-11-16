@@ -55,6 +55,10 @@ EWRAM_DATA volatile u32 gPokeDnDTriggerCount;
  * Count accepted encounters only, not rejected inputs or nearby actors. */
 EWRAM_DATA volatile u32 gPokeDnDNaturalEncounterCount;
 EWRAM_DATA volatile u32 gPokeDnDLastNaturalLocalId;
+/* Native lifecycle evidence: original Rocket survives cleanup on its map,
+ * retaining its local ID, graphics and original tile. 1=preserved,
+ * 2=identity lost, 3=map changed (not safe to inspect recycled slots). */
+EWRAM_DATA volatile u32 gPokeDnDNaturalCleanupStatus;
 /* Increment only after native Emerald accepts a new D-pad input following
  * D20 cancellation AND the player's true map tile subsequently changes.
  * A frame difference or key injection alone must not pass this check. */
@@ -243,6 +247,20 @@ static void CleanupCombat(bool8 restorePlayer)
         sMapNum == gSaveBlock1Ptr->location.mapNum &&
         gPlayerAvatar.objectEventId < OBJECT_EVENTS_COUNT)
         MoveObjectEventToMapCoords(&gObjectEvents[gPlayerAvatar.objectEventId], sEntryX, sEntryY);
+    if (sRocketIsExisting && sActive) {
+        if (sMapGroup != gSaveBlock1Ptr->location.mapGroup ||
+            sMapNum != gSaveBlock1Ptr->location.mapNum)
+            gPokeDnDNaturalCleanupStatus = 3;
+        else if (sRocketObjectId >= OBJECT_EVENTS_COUNT ||
+                 !gObjectEvents[sRocketObjectId].active ||
+                 gObjectEvents[sRocketObjectId].graphicsId != OBJ_EVENT_GFX_ROCKET_M ||
+                 gObjectEvents[sRocketObjectId].localId != sRocketOriginalLocalId ||
+                 gObjectEvents[sRocketObjectId].mapGroup != sMapGroup ||
+                 gObjectEvents[sRocketObjectId].mapNum != sMapNum)
+            gPokeDnDNaturalCleanupStatus = 2;
+        else
+            gPokeDnDNaturalCleanupStatus = 1;
+    }
     /* A natural encounter borrows the original NPC. Restore its tile and
      * preserve the actor, scripts and local ID; only debug sprites are ours. */
     if (sRocketIsExisting && sActive && restorePlayer &&
@@ -401,6 +419,8 @@ static bool StartCombat(u8 scenario, u8 existingRocketId)
     sEntryX = player.x;
     sEntryY = player.y;
     sRocketIsExisting = existingRocketId < OBJECT_EVENTS_COUNT;
+    if (sRocketIsExisting)
+        gPokeDnDNaturalCleanupStatus = 0;
     if (sRocketIsExisting) {
         sRocketObjectId = existingRocketId;
         sRocketOriginalLocalId = gObjectEvents[existingRocketId].localId;
