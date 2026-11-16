@@ -108,7 +108,7 @@ class GDBProbeTests(unittest.TestCase):
         a, b = socket.socketpair()
         memory = bytearray(0x300)
         addresses = dict(zip(probe.NAMES, (0x100 + i * 4 for i in range(len(probe.NAMES)))))
-        expected = (1, 0, 3, 2, 1, 2, 0, 16, 1, 1, 30, 2, 12, 1, 7, 6)
+        expected = (1, 0, 3, 2, 1, 2, 0, 16, 1, 1, 30, 2, 12, 1, 7, 6, 0)
         for index, number in enumerate(expected):
             memory[0x100 + index * 4:0x104 + index * 4] = number.to_bytes(4, "little")
         fake = FakeGDB(b, memory)
