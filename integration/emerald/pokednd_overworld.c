@@ -613,7 +613,7 @@ static bool8 SpawnReplayRocket(u16 newKeys, u16 heldKeys)
     struct MapPosition player;
     s16 x, y;
     u8 facing;
-    if (!(newKeys & SELECT_BUTTON) || !(heldKeys & R_BUTTON))
+    if (!(newKeys & START_BUTTON) || !(heldKeys & R_BUTTON) || (heldKeys & L_BUTTON))
         return FALSE;
     if (ArePlayerFieldControlsLocked()) {
         gPokeDnDReplayFixtureStatus = 1;
