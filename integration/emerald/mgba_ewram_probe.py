@@ -28,6 +28,7 @@ NAMES = (
     "gPokeDnDLastDashMovement",
     "gPokeDnDNaturalEncounterCount",
     "gPokeDnDLastNaturalLocalId",
+    "gPokeDnDNaturalCleanupStatus",
     "gPokeDnDReplayFixtureStatus",
 )
 FIELDS = ("label", "trigger_count", "start_failure", "milestones",
@@ -36,6 +37,7 @@ FIELDS = ("label", "trigger_count", "start_failure", "milestones",
           "outcome_acks", "impact_starts", "impact_frames",
           "dash_count", "last_dash_movement",
           "natural_encounter_count", "last_natural_local_id",
+          "natural_cleanup_status",
           "replay_fixture_status")
 
 
