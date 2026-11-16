@@ -21,7 +21,27 @@ void d20_init(D20Battle *b, uint32_t seed)
 {
     memset(b, 0, sizeof(*b));
     b->cursor = -1; b->selected = -1; b->rng = seed ? seed : 0xC0FFEEu;
+    b->max_trainers = 3; b->max_pokemon_per_trainer = 2;
     for (int y = 0; y < D20_H; y++) for (int x = 0; x < D20_W; x++) b->map[y][x] = '.';
+}
+bool d20_party_limits(D20Battle *b, unsigned int trainers, unsigned int pokemon_per_trainer)
+{
+    unsigned int humans = 0;
+    if (!b || b->started || trainers == 0 || trainers > D20_MAX ||
+        pokemon_per_trainer > D20_MAX - 1) return false;
+    for (int i = 0; i < b->count; i++) {
+        if (b->units[i].role == HUMAN) {
+            unsigned int owned = 0;
+            humans++;
+            for (int j = 0; j < b->count; j++)
+                if (b->units[j].role == POKEMON && b->units[j].owner == i) owned++;
+            if (owned > pokemon_per_trainer) return false;
+        }
+    }
+    if (humans > trainers) return false;
+    b->max_trainers = (uint8_t)trainers;
+    b->max_pokemon_per_trainer = (uint8_t)pokemon_per_trainer;
+    return true;
 }
 int d20_mod(int s) { return s >= 10 ? (s - 10) / 2 : -((11 - s) / 2); }
 int d20_roll(D20Battle *b, int sides)
@@ -39,9 +59,9 @@ int d20_add(D20Battle *b, D20Role role, int owner, int x, int y, bool deployed)
         humans += b->units[i].role == HUMAN;
         owned += b->units[i].role == POKEMON && b->units[i].owner == owner;
     }
-    if (role == HUMAN && (!deployed || owner != -1 || humans >= 3)) return -1;
+    if (role == HUMAN && (!deployed || owner != -1 || humans >= b->max_trainers)) return -1;
     if (role == POKEMON && (deployed || owner < 0 || owner >= b->count ||
-                            b->units[owner].role != HUMAN || owned >= 2)) return -1;
+                            b->units[owner].role != HUMAN || owned >= b->max_pokemon_per_trainer)) return -1;
     if (role == ENEMY && (!deployed || owner != -1)) return -1;
     if (role > ENEMY || (deployed && !free_tile(b, x, y, -1))) return -1;
     id = b->count++; u = &b->units[id]; memset(u, 0, sizeof(*u));
