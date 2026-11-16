@@ -9,8 +9,8 @@ APPLY = ROOT / "integration" / "emerald" / "apply.py"
 class ReplaySourceInjectionTests(unittest.TestCase):
     def test_replay_define_is_line_terminated(self):
         source = APPLY.read_text(encoding="utf-8")
-        self.assertIn('actor.write_text("#define POKEDND_NATIVE_REPLAY_ROCKET 1\\n" +', source)
-        self.assertNotIn('actor.write_text("#define POKEDND_NATIVE_REPLAY_ROCKET 1\\\\n" +', source)
+        self.assertIn(r'actor.write_text("#define POKEDND_NATIVE_REPLAY_ROCKET 1\\n" +', source)
+        self.assertNotIn(r'actor.write_text("#define POKEDND_NATIVE_REPLAY_ROCKET 1\\\\n" +', source)
 
     def test_replay_define_materializes_separate_preprocessor_line(self):
         prefix = "#define POKEDND_NATIVE_REPLAY_ROCKET 1\n"
