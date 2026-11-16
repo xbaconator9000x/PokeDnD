@@ -592,6 +592,9 @@ static bool8 TryRocketFieldEncounter(u16 newKeys)
             obj->localId == D20_ROCKET_LOCAL_ID ||
             obj->mapGroup != gSaveBlock1Ptr->location.mapGroup ||
             obj->mapNum != gSaveBlock1Ptr->location.mapNum ||
+            /* Never hijack a scripted/frozen actor or an NPC on another
+             * elevation. Emerald must retain its ordinary interaction. */
+            obj->frozen || obj->currentElevation != player.elevation ||
             obj->currentCoords.x != targetX ||
             obj->currentCoords.y != targetY)
             continue;
