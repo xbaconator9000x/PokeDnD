@@ -242,6 +242,29 @@ xdotool keyup --window "$WINDOW" s
 xdotool keyup --window "$WINDOW" a
 sleep 1; snap 23-replay-rocket-fixture
 sample fixture-spawn
+# Native field control locks can outlive the 2-second post-defeat wait.
+# Retry only the fixture chord after a genuine idle interval; do not
+# reinterpret a locked admission as successful spawning.
+for retry in 1 2 3 4; do
+  status=$(python3 - "$OUT/runtime-probe.csv" <<'STATUS'
+import csv, sys
+with open(sys.argv[1], newline="") as handle:
+    print(list(csv.DictReader(handle))[-1]["replay_fixture_status"])
+STATUS
+)
+  if [ "$status" != "1" ]; then break; fi
+  sleep 3
+  xdotool keydown --window "$WINDOW" a
+  xdotool keydown --window "$WINDOW" s
+  xdotool keydown --window "$WINDOW" BackSpace
+  key Return
+  xdotool keyup --window "$WINDOW" BackSpace
+  xdotool keyup --window "$WINDOW" s
+  xdotool keyup --window "$WINDOW" a
+  sleep 1
+  snap "23b-fixture-retry-$retry"
+  sample "fixture-retry-$retry"
+done
 python3 - "$OUT/runtime-probe.csv" <<'CHECKFIXTURE'
 import csv, sys
 with open(sys.argv[1], newline="") as handle:
