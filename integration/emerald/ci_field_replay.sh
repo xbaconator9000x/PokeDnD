@@ -253,26 +253,41 @@ with open(sys.argv[1], newline="") as handle:
 STATUS
 )
   if [ "$status" != "1" ] && [ "$status" != "4" ]; then break; fi
-  # First clear any lingering UI/task with B. If the target is occupied,
-  # rotate to another adjacent tile rather than retrying the same NPC tile.
-  # Movement is sent to real mGBA and field-lock checks remain authoritative.
-  key z
-  sleep 1
-  if [ "$status" = "4" ]; then
+  # Never send B as a generic field-recovery key: after Emerald has
+  # resumed, it can interact with a menu rather than dismiss one. In the
+  # previous native run, the third recovery entered a blank/reset-like
+  # screen and zeroed all EWRAM probe fields. Preserve that evidence.
+  # On occupancy, deliberately change the player's facing with D-pad
+  # input; on a lock, allow the field callback to settle before moving.
+  if [ "$status" = "1" ]; then
+    sleep 2
+    key Left
+    sleep 1
+    key Right
+  else
     case "$retry" in
       1) key Up ;;
       2) key Down ;;
       3) key Left ;;
       4) key Right ;;
     esac
-  else
-    key Left
-    sleep 1
-    key Right
   fi
   sleep 2
   snap "23a-field-recovery-$retry"
   sample "field-recovery-$retry"
+  # Detect resets/crashes before issuing another fixture chord. A blank
+  # probe state must never be interpreted as successful recovery.
+  python3 - "$OUT/runtime-probe.csv" <<'CHECKRECOVERY'
+import csv, sys
+with open(sys.argv[1], newline="") as handle:
+    rows = list(csv.DictReader(handle))
+before = next((r for r in reversed(rows) if r["label"] == "defeat-resumed"), None)
+current = rows[-1]
+if before is None:
+    raise SystemExit("FAIL: missing defeat-resumed native baseline")
+if int(current["trigger_count"]) < int(before["trigger_count"]):
+    raise SystemExit("FAIL: native field recovery lost EWRAM battle counters; possible emulator reset")
+CHECKRECOVERY
   xdotool keydown --window "$WINDOW" a
   xdotool keydown --window "$WINDOW" s
   xdotool keydown --window "$WINDOW" BackSpace
