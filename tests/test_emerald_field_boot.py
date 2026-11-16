@@ -102,8 +102,11 @@ class EmeraldFieldBootTests(TestCase):
             with self.subTest(guard=required):
                 self.assertIn(required, handler)
         self.assertLess(handler.index("obj->singleMovementActive"),
-                        handler.index("StartCombat(D20_SCENARIO_STANDARD)"))
+                        handler.index("StartCombat(D20_SCENARIO_STANDARD, i)"))
         self.assertNotIn("AbsCoord(", handler)
+        self.assertIn("gPokeDnDNaturalEncounterCount++", handler)
+        self.assertIn("gPokeDnDLastNaturalLocalId = localId", handler)
+        self.assertIn("StartCombat(D20_SCENARIO_STANDARD, i)", handler)
 
     def test_check_only_does_not_mutate_upstream(self):
         with tempfile.TemporaryDirectory() as tmp:
