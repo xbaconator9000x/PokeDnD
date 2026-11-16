@@ -228,6 +228,50 @@ sleep 2; snap 22-defeat-returned-field
 sample defeat-resumed
 python3 integration/emerald/validate_outcome_replay.py "$OUT/runtime-probe.csv" "$OUT"
 assert_no_natural_encounter
+# Native source-only fixture: R+SELECT places an upstream Rocket object
+# immediately in front of the player. Pressing A must enter combat through
+# the same ordinary facing-direction interaction as a map-authored NPC.
+# The fixture is explicitly not evidence of an authored Rocket map encounter.
+xdotool keydown --window "$WINDOW" s
+key BackSpace
+xdotool keyup --window "$WINDOW" s
+sleep 1; snap 23-replay-rocket-fixture
+key x
+sleep 2; snap 24-facing-a-natural-encounter
+sample natural-start
+python3 - "$OUT/runtime-probe.csv" <<'CHECKNATIVE'
+import csv, sys
+with open(sys.argv[1], newline="") as handle:
+    row = list(csv.DictReader(handle))[-1]
+if (int(row["natural_encounter_count"]) != 1 or
+    int(row["last_natural_local_id"]) != 230 or
+    int(row["diagnostic_state"]) != 1 or
+    int(row["start_failure"]) != 0):
+    raise SystemExit("FAIL: facing-A fixture did not start a native Rocket encounter")
+print("PASS: live mGBA facing-A activated existing native Rocket object event")
+CHECKNATIVE
+key BackSpace
+sleep 1; snap 25-natural-cancelled
+sample natural-cancelled
+python3 - "$OUT/runtime-probe.csv" <<'CHECKNATIVECANCEL'
+import csv, sys
+with open(sys.argv[1], newline="") as handle:
+    row = list(csv.DictReader(handle))[-1]
+if int(row["diagnostic_state"]) != 4 or int(row["natural_encounter_count"]) != 1:
+    raise SystemExit("FAIL: natural encounter cancellation did not preserve attribution")
+print("PASS: native Rocket encounter cancelled without resetting attribution")
+CHECKNATIVECANCEL
+key Right
+sleep 2; snap 26-natural-field-restored
+sample natural-resumed
+python3 - "$OUT/runtime-probe.csv" <<'CHECKNATIVERESUME'
+import csv, sys
+with open(sys.argv[1], newline="") as handle:
+    row = list(csv.DictReader(handle))[-1]
+if int(row["post_cancel_moves"]) < 1:
+    raise SystemExit("FAIL: native Rocket encounter did not restore field movement")
+print("PASS: native facing-A Rocket encounter restored real field movement")
+CHECKNATIVERESUME
 # Preserve the exact ROM identity and reproducible input sequence alongside frames.
 # A replay of a stale ROM cannot establish acceptance of the current source HEAD.
 sha256sum "$ROM" | awk '{print $1}' > "$OUT/rom-sha256.txt"
