@@ -271,7 +271,13 @@ with open(sys.argv[1], newline="") as handle:
     row = list(csv.DictReader(handle))[-1]
 status = int(row["replay_fixture_status"])
 if status != 6:
-    raise SystemExit(f"FAIL: Rocket fixture status {status} (0=no chord, 1=locked, 2=facing, 3=blocked, 4=occupied, 5=allocation)")
+    raise SystemExit(
+        f"FAIL: Rocket fixture status {status} "
+        "(0=no chord, 1=locked, 2=facing, 3=blocked, 4=occupied, 5=allocation); "
+        f"native attempts={row['replay_fixture_attempt_count']}, "
+        f"field lock observations={row['replay_fixture_lock_count']}. "
+        "Do not bypass Emerald's field-control lock to manufacture a pass."
+    )
 print("PASS: native Emerald allocated a real Rocket fixture object event")
 CHECKFIXTURE
 key x
