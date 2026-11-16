@@ -92,6 +92,7 @@ class EmeraldFieldBootTests(TestCase):
             "obj->currentCoords.x != targetX",
             "obj->currentCoords.y != targetY",
             "obj->frozen",
+            "obj->invisible",
             "obj->currentElevation != player.elevation",
             "obj->heldMovementActive",
             "obj->singleMovementActive",
