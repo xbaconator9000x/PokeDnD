@@ -42,7 +42,8 @@ class RuntimeProbeExecutionTests(unittest.TestCase):
         status, verdict = run_trace([(0, 0, 0, 0, 0), (1, 0, 1, 1, 0),
                                      (1, 0, 3, 2, 0), (1, 0, 135, 3, 0),
                                      (1, 0, 167, 3, 0), (1, 0, 231, 3, 0),
-                                     (1, 0, 239, 4, 0), (1, 0, 239, 4, 1)])
+                                     (1, 0, 231, 3, 0), (1, 0, 239, 4, 0),
+                                     (1, 0, 239, 4, 1)])
         self.assertEqual(status, 0)
         self.assertTrue(verdict.startswith("PASS"))
 
