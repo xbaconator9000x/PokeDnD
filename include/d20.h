@@ -34,6 +34,14 @@ typedef struct {
     int natural, total, damage;
     int second_roll; /* 0 normally; the second d20 when Dodge imposed disadvantage */
 } D20Attack;
+/* Creator-defined actor template. No species or copyrighted rules data embedded. */
+typedef struct {
+    uint8_t stats[ABILITIES];
+    uint8_t speed_feet, proficiency;
+    int16_t hp, ac;
+} D20ActorTemplate;
+/* Only before combat. Invalid templates leave the actor unchanged. */
+bool d20_apply_template(D20Battle *b, int actor, const D20ActorTemplate *template_data);
 void d20_init(D20Battle *b, uint32_t seed);
 /* Set before adding actors; limits are validated against the current roster. */
 bool d20_party_limits(D20Battle *b, unsigned int trainers, unsigned int pokemon_per_trainer);
