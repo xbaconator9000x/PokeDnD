@@ -62,10 +62,10 @@ class ReplayWorkflowTests(unittest.TestCase):
 
     def test_rejected_debug_chord_is_consumed(self):
         source = (ROOT / "integration/emerald/pokednd_overworld.c").read_text()
-        self.assertIn("(void)StartCombat(scenario);", source)
+        self.assertIn("(void)StartCombat(scenario, OBJECT_EVENTS_COUNT);", source)
         self.assertIn("gPokeDnDTriggerCount++;", source)
         self.assertNotIn("return StartCombat(scenario);", source)
-        self.assertIn("return TRUE;", source.split("(void)StartCombat(scenario);", 1)[1].split("return FALSE;", 1)[0])
+        self.assertIn("return TRUE;", source.split("(void)StartCombat(scenario, OBJECT_EVENTS_COUNT);", 1)[1].split("return FALSE;", 1)[0])
 
     def test_rocket_field_interaction_is_native_and_safe(self):
         source = (ROOT / "integration/emerald/pokednd_overworld.c").read_text()
@@ -80,7 +80,7 @@ class ReplayWorkflowTests(unittest.TestCase):
         self.assertIn("obj->currentCoords.x != targetX", source)
         self.assertIn("obj->currentCoords.y != targetY", source)
         self.assertNotIn("AbsCoord(obj->currentCoords.x - player.x)", source)
-        self.assertIn("if (StartCombat(D20_SCENARIO_STANDARD))", source)
+        self.assertIn("if (StartCombat(D20_SCENARIO_STANDARD, i))", source)
         self.assertIn("return FALSE;\n    }\n    return FALSE;\n}\nbool8 PokeDnD_HandleOverworldInput", source)
 
     def test_upstream_pin_matches_native_build(self):
