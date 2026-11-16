@@ -90,6 +90,10 @@ static EWRAM_DATA D20Battle sBattle;
 static EWRAM_DATA D20FieldProjection sProjection;
 static EWRAM_DATA D20FieldEncounter sUnits;
 static EWRAM_DATA u8 sRocketObjectId;
+static EWRAM_DATA bool8 sRocketIsExisting;
+static EWRAM_DATA u8 sRocketOriginalLocalId;
+static EWRAM_DATA s16 sRocketOriginalX;
+static EWRAM_DATA s16 sRocketOriginalY;
 static EWRAM_DATA u8 sPikachuObjectId;
 static EWRAM_DATA u8 sActive;
 static EWRAM_DATA u8 sMapGroup;
@@ -239,9 +243,18 @@ static void CleanupCombat(bool8 restorePlayer)
         sMapNum == gSaveBlock1Ptr->location.mapNum &&
         gPlayerAvatar.objectEventId < OBJECT_EVENTS_COUNT)
         MoveObjectEventToMapCoords(&gObjectEvents[gPlayerAvatar.objectEventId], sEntryX, sEntryY);
+    /* A natural encounter borrows the original NPC. Restore its tile and
+     * preserve the actor, scripts and local ID; only debug sprites are ours. */
+    if (sRocketIsExisting && sRocketObjectId < OBJECT_EVENTS_COUNT &&
+        gObjectEvents[sRocketObjectId].active &&
+        gObjectEvents[sRocketObjectId].localId == sRocketOriginalLocalId &&
+        gObjectEvents[sRocketObjectId].mapGroup == sMapGroup &&
+        gObjectEvents[sRocketObjectId].mapNum == sMapNum)
+        MoveObjectEventToMapCoords(&gObjectEvents[sRocketObjectId],
+                                   sRocketOriginalX, sRocketOriginalY);
     /* Object-event slots can be recycled after an unexpected map warp.
      * Never destroy a real map NPC merely because it reused our old slot. */
-    if (sRocketObjectId < OBJECT_EVENTS_COUNT &&
+    if (!sRocketIsExisting && sRocketObjectId < OBJECT_EVENTS_COUNT &&
         gObjectEvents[sRocketObjectId].active &&
         gObjectEvents[sRocketObjectId].localId == D20_ROCKET_LOCAL_ID &&
         gObjectEvents[sRocketObjectId].mapNum == sMapNum &&
@@ -254,6 +267,7 @@ static void CleanupCombat(bool8 restorePlayer)
         gObjectEvents[sPikachuObjectId].mapGroup == sMapGroup)
         RemoveObjectEvent(&gObjectEvents[sPikachuObjectId]);
     sActive = FALSE;
+    sRocketIsExisting = FALSE;
     sRocketObjectId = OBJECT_EVENTS_COUNT;
     sPikachuObjectId = OBJECT_EVENTS_COUNT;
 }
@@ -310,7 +324,7 @@ static bool SpawnPikachu(void)
     }
     return false;
 }
-static bool StartCombat(u8 scenario)
+static bool StartCombat(u8 scenario, u8 existingRocketId)
 {
     struct MapPosition player;
     int wx, wy;
@@ -340,7 +354,11 @@ static bool StartCombat(u8 scenario)
     d20_init(&sBattle, 0x12345678u ^ (u32)(player.x * 7919 + player.y * 104729));
     if (!d20_field_project(&sBattle,&sProjection,player.x,player.y,
                            D20MapBlocked,NULL) ||
-        !d20_field_spawn_demo(&sBattle,&sProjection,&sUnits)) {
+        !(existingRocketId < OBJECT_EVENTS_COUNT
+          ? d20_field_spawn_existing(&sBattle, &sProjection, &sUnits,
+              gObjectEvents[existingRocketId].currentCoords.x,
+              gObjectEvents[existingRocketId].currentCoords.y)
+          : d20_field_spawn_demo(&sBattle,&sProjection,&sUnits))) {
         gPokeDnDStartFailure = 2;
         return false;
     }
@@ -350,7 +368,8 @@ static bool StartCombat(u8 scenario)
         return false;
     }
     /* Fail closed if the world has a conflicting reserved local ID. */
-    if (!TryGetObjectEventIdByLocalIdAndMap(D20_ROCKET_LOCAL_ID,
+    if (existingRocketId == OBJECT_EVENTS_COUNT &&
+        !TryGetObjectEventIdByLocalIdAndMap(D20_ROCKET_LOCAL_ID,
             gSaveBlock1Ptr->location.mapNum,
             gSaveBlock1Ptr->location.mapGroup, &sRocketObjectId)) {
         gPokeDnDStartFailure = 4;
@@ -367,9 +386,17 @@ static bool StartCombat(u8 scenario)
     sElevation = player.elevation;
     sEntryX = player.x;
     sEntryY = player.y;
-    sRocketObjectId = SpawnSpecialObjectEventParameterized(
-        OBJ_EVENT_GFX_ROCKET_M, MOVEMENT_TYPE_NONE,
-        D20_ROCKET_LOCAL_ID, wx, wy, sElevation);
+    sRocketIsExisting = existingRocketId < OBJECT_EVENTS_COUNT;
+    if (sRocketIsExisting) {
+        sRocketObjectId = existingRocketId;
+        sRocketOriginalLocalId = gObjectEvents[existingRocketId].localId;
+        sRocketOriginalX = gObjectEvents[existingRocketId].currentCoords.x;
+        sRocketOriginalY = gObjectEvents[existingRocketId].currentCoords.y;
+    } else {
+        sRocketObjectId = SpawnSpecialObjectEventParameterized(
+            OBJ_EVENT_GFX_ROCKET_M, MOVEMENT_TYPE_NONE,
+            D20_ROCKET_LOCAL_ID, wx, wy, sElevation);
+    }
     sPikachuObjectId = OBJECT_EVENTS_COUNT;
     if (sRocketObjectId == OBJECT_EVENTS_COUNT) {
         gPokeDnDStartFailure = 6;
@@ -395,13 +422,14 @@ static bool StartCombat(u8 scenario)
     if (!d20_start(&sBattle)) {
         /* The encounter is not active yet: CleanupCombat cannot own this
          * sprite. Roll back the freshly allocated Rocket explicitly. */
-        if (sRocketObjectId < OBJECT_EVENTS_COUNT &&
+        if (!sRocketIsExisting && sRocketObjectId < OBJECT_EVENTS_COUNT &&
             gObjectEvents[sRocketObjectId].active &&
             gObjectEvents[sRocketObjectId].localId == D20_ROCKET_LOCAL_ID &&
             gObjectEvents[sRocketObjectId].mapGroup == sMapGroup &&
             gObjectEvents[sRocketObjectId].mapNum == sMapNum)
             RemoveObjectEvent(&gObjectEvents[sRocketObjectId]);
         sRocketObjectId = OBJECT_EVENTS_COUNT;
+        sRocketIsExisting = FALSE;
         gPokeDnDStartFailure = 7;
         return false;
     }
@@ -610,7 +638,7 @@ static bool8 TryRocketFieldEncounter(u16 newKeys)
         /* StartCombat may allocate sprites and freeze actors. Capture the
          * source NPC identity before those allocations can reuse slots. */
         const u8 localId = obj->localId;
-        if (StartCombat(D20_SCENARIO_STANDARD)) {
+        if (StartCombat(D20_SCENARIO_STANDARD, i)) {
             gPokeDnDTriggerCount++;
             gPokeDnDNaturalEncounterCount++;
             gPokeDnDLastNaturalLocalId = localId;
@@ -651,7 +679,7 @@ bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
                 scenario = D20_SCENARIO_DEFEAT;
             gPokeDnDTriggerCount++;
             /* A rejected debug encounter must not leak START to Emerald.\n             * Otherwise the same chord unexpectedly opens the field menu,\n             * obscuring the native admission error and consuming input. */
-            (void)StartCombat(scenario);
+            (void)StartCombat(scenario, OBJECT_EVENTS_COUNT);
             return TRUE;
         }
         if (TryRocketFieldEncounter(newKeys))
