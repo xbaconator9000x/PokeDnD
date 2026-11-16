@@ -1,6 +1,10 @@
 # PokéDND 🎲
 
-**Experimental project:** a Pokémon-inspired, top-down tactical CRPG grounded in the revised 2024 D&D 5e rules (SRD 5.2.1).
+**Core mission:** a reusable, creator-oriented D&D 5e (2024 / SRD 5.2.1) tactical RPG framework for Pokémon-derived overworld engines. **Pokémon mechanics are optional.** Creators can build conventional D&D campaigns with no Pokémon, Pokémon 5e (2024) campaigns, or hybrid adventures.
+
+**Fundamental architecture:** [Core architecture and GBA-first / DS-ready contract](docs/CORE_ARCHITECTURE.md). The shared portable C99 rules and campaign data must remain independent of both Pokémon-specific rules and Emerald internals. Finish the GBA/pokeemerald-expansion playable proof first; design adapter boundaries for a future Nintendo DS/Gen 4 port without splitting current development effort.
+
+**Current implementation status:** existing Rocket/Pikachu encounters, trainer-group initiative, command costs, and 3-human/2-Pokémon limits are experimental prototype mechanics, **not universal framework rules or verified Pokémon 5e (2024) defaults**. Native mGBA acceptance is still pending.
 
 ## Design
 
