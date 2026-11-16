@@ -236,6 +236,16 @@ xdotool keydown --window "$WINDOW" s
 key BackSpace
 xdotool keyup --window "$WINDOW" s
 sleep 1; snap 23-replay-rocket-fixture
+sample fixture-spawn
+python3 - "$OUT/runtime-probe.csv" <<'CHECKFIXTURE'
+import csv, sys
+with open(sys.argv[1], newline="") as handle:
+    row = list(csv.DictReader(handle))[-1]
+status = int(row["replay_fixture_status"])
+if status != 6:
+    raise SystemExit(f"FAIL: Rocket fixture status {status} (0=no chord, 1=locked, 2=facing, 3=blocked, 4=occupied, 5=allocation)")
+print("PASS: native Emerald allocated a real Rocket fixture object event")
+CHECKFIXTURE
 key x
 sleep 2; snap 24-facing-a-natural-encounter
 sample natural-start
