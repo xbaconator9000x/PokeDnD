@@ -605,14 +605,20 @@ static void MoveSelected(u16 newKeys)
 /* CI-only: create a real native object event on the tile the player faces.
  * The fixture uses upstream Emerald graphics and normal A interaction; it
  * is never compiled into the normal integration or committed as ROM data. */
+/* CI-only diagnostics: 0=not attempted, 1=controls locked, 2=invalid facing,
+ * 3=blocked tile, 4=occupied tile, 5=allocation failed, 6=spawned. */
+EWRAM_DATA volatile u32 gPokeDnDReplayFixtureStatus;
 static bool8 SpawnReplayRocket(u16 newKeys, u16 heldKeys)
 {
     struct MapPosition player;
     s16 x, y;
     u8 facing;
-    if (!(newKeys & SELECT_BUTTON) || !(heldKeys & R_BUTTON) ||
-        ArePlayerFieldControlsLocked())
+    if (!(newKeys & SELECT_BUTTON) || !(heldKeys & R_BUTTON))
         return FALSE;
+    if (ArePlayerFieldControlsLocked()) {
+        gPokeDnDReplayFixtureStatus = 1;
+        return TRUE;
+    }
     GetPlayerPosition(&player);
     x = player.x;
     y = player.y;
@@ -621,18 +627,27 @@ static bool8 SpawnReplayRocket(u16 newKeys, u16 heldKeys)
     else if (facing == DIR_SOUTH) y++;
     else if (facing == DIR_WEST) x--;
     else if (facing == DIR_EAST) x++;
-    else return TRUE;
-    if (!AreCoordsInsidePlayerMap(x, y) || MapGridGetCollisionAt(x, y))
+    else {
+        gPokeDnDReplayFixtureStatus = 2;
         return TRUE;
+    }
+    if (!AreCoordsInsidePlayerMap(x, y) || MapGridGetCollisionAt(x, y)) {
+        gPokeDnDReplayFixtureStatus = 3;
+        return TRUE;
+    }
     for (int i = 0; i < OBJECT_EVENTS_COUNT; i++) {
         const struct ObjectEvent *obj = &gObjectEvents[i];
         if (obj->active && obj->mapGroup == gSaveBlock1Ptr->location.mapGroup &&
             obj->mapNum == gSaveBlock1Ptr->location.mapNum &&
-            obj->currentCoords.x == x && obj->currentCoords.y == y)
+            obj->currentCoords.x == x && obj->currentCoords.y == y) {
+            gPokeDnDReplayFixtureStatus = 4;
             return TRUE;
+        }
     }
-    (void)SpawnSpecialObjectEventParameterized(OBJ_EVENT_GFX_ROCKET_M,
-        MOVEMENT_TYPE_NONE, 230, x, y, player.elevation);
+    gPokeDnDReplayFixtureStatus =
+        SpawnSpecialObjectEventParameterized(OBJ_EVENT_GFX_ROCKET_M,
+            MOVEMENT_TYPE_NONE, 230, x, y, player.elevation) == OBJECT_EVENTS_COUNT
+        ? 5 : 6;
     return TRUE;
 }
 #endif
