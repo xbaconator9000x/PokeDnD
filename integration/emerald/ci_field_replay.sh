@@ -269,6 +269,8 @@ with open(sys.argv[1], newline="") as handle:
     row = list(csv.DictReader(handle))[-1]
 if int(row["diagnostic_state"]) != 4 or int(row["natural_encounter_count"]) != 1:
     raise SystemExit("FAIL: natural encounter cancellation did not preserve attribution")
+if int(row["natural_cleanup_status"]) != 1:
+    raise SystemExit("FAIL: original Rocket NPC identity was not preserved on cleanup")
 print("PASS: native Rocket encounter cancelled without resetting attribution")
 CHECKNATIVECANCEL
 key Right
