@@ -81,6 +81,29 @@ class EmeraldFieldBootTests(TestCase):
             self.assertEqual((root / "src/overworld.c").read_text(), OVERWORLD)
             self.assertFalse((root / "src/pokednd_overworld.c").exists())
 
+    def test_natural_rocket_encounter_respects_native_actor_state(self):
+        """Source contract: ordinary A interactions must not hijack busy NPCs."""
+        source = (ROOT / "integration/emerald/pokednd_overworld.c").read_text()
+        start = source.index("static bool8 TryRocketFieldEncounter(")
+        end = source.index("bool8 PokeDnD_HandleOverworldInput(", start)
+        handler = source[start:end]
+        for required in (
+            "GetPlayerFacingDirection()",
+            "obj->currentCoords.x != targetX",
+            "obj->currentCoords.y != targetY",
+            "obj->frozen",
+            "obj->currentElevation != player.elevation",
+            "obj->heldMovementActive",
+            "obj->singleMovementActive",
+            "obj->mapGroup != gSaveBlock1Ptr->location.mapGroup",
+            "obj->mapNum != gSaveBlock1Ptr->location.mapNum",
+        ):
+            with self.subTest(guard=required):
+                self.assertIn(required, handler)
+        self.assertLess(handler.index("obj->singleMovementActive"),
+                        handler.index("StartCombat(D20_SCENARIO_STANDARD)"))
+        self.assertNotIn("AbsCoord(", handler)
+
     def test_check_only_does_not_mutate_upstream(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
