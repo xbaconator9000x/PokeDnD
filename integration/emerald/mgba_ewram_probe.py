@@ -30,6 +30,9 @@ NAMES = (
     "gPokeDnDLastNaturalLocalId",
     "gPokeDnDNaturalCleanupStatus",
     "gPokeDnDReplayFixtureStatus",
+    "gPokeDnDReplayLockObservations",
+    "gPokeDnDReplayNaturalLockObservations",
+    "gPokeDnDReplayFixtureAttemptCount",
 )
 FIELDS = ("label", "trigger_count", "start_failure", "milestones",
           "diagnostic_state", "post_cancel_moves",
@@ -38,7 +41,9 @@ FIELDS = ("label", "trigger_count", "start_failure", "milestones",
           "dash_count", "last_dash_movement",
           "natural_encounter_count", "last_natural_local_id",
           "natural_cleanup_status",
-          "replay_fixture_status")
+          "replay_fixture_status",
+          "replay_fixture_lock_count", "replay_natural_lock_count",
+          "replay_fixture_attempt_count")
 
 
 def symbol_addresses(elf: Path, nm: str = "arm-none-eabi-nm"):
