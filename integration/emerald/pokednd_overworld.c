@@ -572,9 +572,19 @@ static void MoveSelected(u16 newKeys)
 static bool8 TryRocketFieldEncounter(u16 newKeys)
 {
     struct MapPosition player;
+    s16 targetX, targetY;
+    u8 facing;
     if (!(newKeys & A_BUTTON) || ArePlayerFieldControlsLocked())
         return FALSE;
     GetPlayerPosition(&player);
+    targetX = player.x;
+    targetY = player.y;
+    facing = GetPlayerFacingDirection();
+    if (facing == DIR_NORTH) targetY--;
+    else if (facing == DIR_SOUTH) targetY++;
+    else if (facing == DIR_WEST) targetX--;
+    else if (facing == DIR_EAST) targetX++;
+    else return FALSE;
     for (int i = 0; i < OBJECT_EVENTS_COUNT; i++) {
         const struct ObjectEvent *obj = &gObjectEvents[i];
         if (!obj->active || obj->isPlayer ||
@@ -582,8 +592,8 @@ static bool8 TryRocketFieldEncounter(u16 newKeys)
             obj->localId == D20_ROCKET_LOCAL_ID ||
             obj->mapGroup != gSaveBlock1Ptr->location.mapGroup ||
             obj->mapNum != gSaveBlock1Ptr->location.mapNum ||
-            AbsCoord(obj->currentCoords.x - player.x) +
-            AbsCoord(obj->currentCoords.y - player.y) != 1)
+            obj->currentCoords.x != targetX ||
+            obj->currentCoords.y != targetY)
             continue;
         if (StartCombat(D20_SCENARIO_STANDARD)) {
             gPokeDnDTriggerCount++;
