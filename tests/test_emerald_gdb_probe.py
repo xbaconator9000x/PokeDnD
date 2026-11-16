@@ -113,7 +113,7 @@ class GDBProbeTests(unittest.TestCase):
         # passing an uninitialised zero from the fake memory buffer.
         expected_by_name = dict(zip(probe.NAMES, (
             1, 0, 3, 2, 1, 2, 0, 16, 1, 1, 30, 2, 12, 1, 7, 6, 0,
-            4, 2, 1,  # fixture attempts, locked observations, last lock
+            2, 1, 4,  # fixture lock observations, natural lock observations, attempts
         ), strict=True))
         expected = tuple(expected_by_name[name] for name in probe.NAMES)
         for index, number in enumerate(expected):
