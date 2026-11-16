@@ -52,3 +52,26 @@ bool d20_field_spawn_demo(D20Battle *b, const D20FieldProjection *p,
     ids->enemy = d20_add(b, ENEMY, -1, ex,ey,true);
     return ids->pokemon >= 0 && ids->enemy >= 0;
 }
+
+/* Natural encounter: the world actor already occupies this blocked tile.
+ * Permit only that explicit tile; do not erase walls or other collisions. */
+bool d20_field_spawn_existing(D20Battle *b, const D20FieldProjection *p,
+                              D20FieldEncounter *ids, int enemyWorldX,
+                              int enemyWorldY)
+{
+    int ex, ey;
+    if (!b || !p || !ids || b->started || b->count ||
+        !d20_field_to_local(p, enemyWorldX, enemyWorldY, &ex, &ey) ||
+        b->map[p->centerY][p->centerX] != '.' ||
+        abs_int(ex - p->centerX) + abs_int(ey - p->centerY) != 1 ||
+        b->map[ey][ex] != '#')
+        return false;
+    /* Projection marks existing actors as blocked. Only the selected NPC
+     * is converted to an occupied combat tile, not a walkable empty tile. */
+    b->map[ey][ex] = '.';
+    ids->human = d20_add(b, HUMAN, -1, p->centerX, p->centerY, true);
+    ids->pokemon = d20_add(b, POKEMON, ids->human,
+                           p->centerX, p->centerY, false);
+    ids->enemy = d20_add(b, ENEMY, -1, ex, ey, true);
+    return ids->human >= 0 && ids->pokemon >= 0 && ids->enemy >= 0;
+}
