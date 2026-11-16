@@ -108,7 +108,14 @@ class GDBProbeTests(unittest.TestCase):
         a, b = socket.socketpair()
         memory = bytearray(0x300)
         addresses = dict(zip(probe.NAMES, (0x100 + i * 4 for i in range(len(probe.NAMES)))))
-        expected = (1, 0, 3, 2, 1, 2, 0, 16, 1, 1, 30, 2, 12, 1, 7, 6, 0)
+        # Keep fixture diagnostic fields in the mock protocol contract. A new
+        # EWRAM probe field must be represented here rather than silently
+        # passing an uninitialised zero from the fake memory buffer.
+        expected_by_name = dict(zip(probe.NAMES, (
+            1, 0, 3, 2, 1, 2, 0, 16, 1, 1, 30, 2, 12, 1, 7, 6, 0,
+            4, 2, 1,  # fixture attempts, locked observations, last lock
+        ), strict=True))
+        expected = tuple(expected_by_name[name] for name in probe.NAMES)
         for index, number in enumerate(expected):
             memory[0x100 + index * 4:0x104 + index * 4] = number.to_bytes(4, "little")
         fake = FakeGDB(b, memory)
