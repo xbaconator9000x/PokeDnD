@@ -51,6 +51,10 @@ EWRAM_DATA volatile u32 gPokeDnDStartFailure;
 /* Incremented only when the native field input hook actually sees the chord.
  * A zero value distinguishes input/hook failures from encounter rejection. */
 EWRAM_DATA volatile u32 gPokeDnDTriggerCount;
+/* Distinguish genuine facing-A NPC encounters from the debug chord.
+ * Count accepted encounters only, not rejected inputs or nearby actors. */
+EWRAM_DATA volatile u32 gPokeDnDNaturalEncounterCount;
+EWRAM_DATA volatile u32 gPokeDnDLastNaturalLocalId;
 /* Increment only after native Emerald accepts a new D-pad input following
  * D20 cancellation AND the player's true map tile subsequently changes.
  * A frame difference or key injection alone must not pass this check. */
@@ -603,8 +607,13 @@ static bool8 TryRocketFieldEncounter(u16 newKeys)
             obj->currentCoords.x != targetX ||
             obj->currentCoords.y != targetY)
             continue;
+        /* StartCombat may allocate sprites and freeze actors. Capture the
+         * source NPC identity before those allocations can reuse slots. */
+        const u8 localId = obj->localId;
         if (StartCombat(D20_SCENARIO_STANDARD)) {
             gPokeDnDTriggerCount++;
+            gPokeDnDNaturalEncounterCount++;
+            gPokeDnDLastNaturalLocalId = localId;
             return TRUE;
         }
         return FALSE;
