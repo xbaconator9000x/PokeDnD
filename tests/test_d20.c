@@ -401,6 +401,34 @@ static void test_dash_cannot_bypass_terrain_or_actor_ownership(void)
     CHECK(!d20_dash(&b,p));
 }
 
+static void test_configurable_campaign_party_policy(void)
+{
+    D20Battle b;
+    int h, p;
+    d20_init(&b, 123);
+    CHECK(b.max_trainers == 3 && b.max_pokemon_per_trainer == 2);
+    CHECK(!d20_party_limits(NULL, 1, 1));
+    CHECK(!d20_party_limits(&b, 0, 1));
+    CHECK(!d20_party_limits(&b, D20_MAX + 1, 1));
+    CHECK(!d20_party_limits(&b, 1, D20_MAX));
+    CHECK(d20_party_limits(&b, 1, 3));
+    h = d20_add(&b, HUMAN, -1, 1, 1, true);
+    CHECK(h == 0);
+    CHECK(d20_add(&b, HUMAN, -1, 2, 1, true) == -1);
+    for (int i = 0; i < 3; i++)
+        CHECK(d20_add(&b, POKEMON, h, 1, 1, false) >= 0);
+    CHECK(d20_add(&b, POKEMON, h, 1, 1, false) == -1);
+    CHECK(!d20_party_limits(&b, 1, 2));
+    CHECK(b.max_pokemon_per_trainer == 3);
+    CHECK(d20_party_limits(&b, 2, 3));
+    CHECK(d20_add(&b, HUMAN, -1, 2, 1, true) >= 0);
+    CHECK(!d20_party_limits(&b, 1, 3));
+    CHECK(d20_party_limits(&b, 2, 0) == false);
+    CHECK(d20_add(&b, ENEMY, -1, 6, 1, true) >= 0);
+    CHECK(d20_start(&b));
+    CHECK(!d20_party_limits(&b, 4, 4));
+}
+
 int main(void)
 {
     test_dash_cannot_bypass_terrain_or_actor_ownership();
@@ -408,6 +436,7 @@ int main(void)
     test_dash_rejects_invalid_movement_without_action_loss();
     test_ability_and_dice();
     test_party_limits();
+    test_configurable_campaign_party_policy();
     test_initiative_deploy_and_command();
     test_path_and_blockers();
     test_los_and_closed_corner();
