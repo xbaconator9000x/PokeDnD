@@ -401,6 +401,34 @@ static void test_dash_cannot_bypass_terrain_or_actor_ownership(void)
     CHECK(!d20_dash(&b,p));
 }
 
+static void test_creator_actor_templates(void)
+{
+    D20Battle b;
+    D20ActorTemplate t = {{16, 14, 12, 10, 11, 9}, 40, 3, 32, 15};
+    d20_init(&b, 77);
+    int h = d20_add(&b, HUMAN, -1, 1, 1, true);
+    int e = d20_add(&b, ENEMY, -1, 5, 5, true);
+    CHECK(h == 0 && e == 1);
+    CHECK(d20_apply_template(&b, h, &t));
+    CHECK(b.units[h].hp == 32 && b.units[h].max_hp == 32);
+    CHECK(b.units[h].ac == 15 && b.units[h].speed == 8);
+    CHECK(b.units[h].stats[STR] == 16 && b.units[h].proficiency == 3);
+    t.stats[DEX] = 0;
+    CHECK(!d20_apply_template(&b, h, &t));
+    CHECK(b.units[h].stats[DEX] == 14);
+    t.stats[DEX] = 14;
+    t.hp = -1;
+    CHECK(!d20_apply_template(&b, h, &t));
+    CHECK(b.units[h].hp == 32);
+    t.hp = 32;
+    CHECK(!d20_apply_template(&b, -1, &t));
+    CHECK(!d20_apply_template(&b, D20_MAX, &t));
+    CHECK(!d20_apply_template(NULL, h, &t));
+    CHECK(!d20_apply_template(&b, h, NULL));
+    CHECK(d20_start(&b));
+    CHECK(!d20_apply_template(&b, h, &t));
+}
+
 static void test_configurable_campaign_party_policy(void)
 {
     D20Battle b;
@@ -437,6 +465,7 @@ int main(void)
     test_ability_and_dice();
     test_party_limits();
     test_configurable_campaign_party_policy();
+    test_creator_actor_templates();
     test_initiative_deploy_and_command();
     test_path_and_blockers();
     test_los_and_closed_corner();
