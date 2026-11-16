@@ -645,8 +645,14 @@ static void MoveSelected(u16 newKeys)
  * The fixture uses upstream Emerald graphics and normal A interaction; it
  * is never compiled into the normal integration or committed as ROM data. */
 /* CI-only diagnostics: 0=not attempted, 1=controls locked, 2=invalid facing,
- * 3=blocked tile, 4=occupied tile, 5=allocation failed, 6=spawned. */
+ * 3=blocked tile, 4=occupied tile, 5=allocation failed, 6=spawned.
+ * Capture the genuine control lock both at fixture admission and at the
+ * ordinary facing-A interaction. No bypass is allowed: a locked field
+ * cannot be counted as a successful native encounter. */
 EWRAM_DATA volatile u32 gPokeDnDReplayFixtureStatus;
+EWRAM_DATA volatile u32 gPokeDnDReplayLockObservations;
+EWRAM_DATA volatile u32 gPokeDnDReplayNaturalLockObservations;
+EWRAM_DATA volatile u32 gPokeDnDReplayFixtureAttemptCount;
 static bool8 SpawnReplayRocket(u16 newKeys, u16 heldKeys)
 {
     struct MapPosition player;
@@ -656,7 +662,9 @@ static bool8 SpawnReplayRocket(u16 newKeys, u16 heldKeys)
         (heldKeys & (L_BUTTON | R_BUTTON | SELECT_BUTTON | START_BUTTON)) !=
             (L_BUTTON | R_BUTTON | SELECT_BUTTON | START_BUTTON))
         return FALSE;
+    gPokeDnDReplayFixtureAttemptCount++;
     if (ArePlayerFieldControlsLocked()) {
+        gPokeDnDReplayLockObservations++;
         gPokeDnDReplayFixtureStatus = 1;
         return TRUE;
     }
@@ -697,8 +705,14 @@ static bool8 TryRocketFieldEncounter(u16 newKeys)
     struct MapPosition player;
     s16 targetX, targetY;
     u8 facing;
-    if (!(newKeys & A_BUTTON) || ArePlayerFieldControlsLocked())
+    if (!(newKeys & A_BUTTON))
         return FALSE;
+    if (ArePlayerFieldControlsLocked()) {
+#ifdef POKEDND_NATIVE_REPLAY_ROCKET
+        gPokeDnDReplayNaturalLockObservations++;
+#endif
+        return FALSE;
+    }
     GetPlayerPosition(&player);
     targetX = player.x;
     targetY = player.y;
