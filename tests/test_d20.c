@@ -404,7 +404,7 @@ static void test_dash_cannot_bypass_terrain_or_actor_ownership(void)
 static void test_configurable_campaign_party_policy(void)
 {
     D20Battle b;
-    int h, p;
+    int h;
     d20_init(&b, 123);
     CHECK(b.max_trainers == 3 && b.max_pokemon_per_trainer == 2);
     CHECK(!d20_party_limits(NULL, 1, 1));
