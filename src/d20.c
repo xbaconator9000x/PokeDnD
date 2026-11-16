@@ -43,6 +43,24 @@ bool d20_party_limits(D20Battle *b, unsigned int trainers, unsigned int pokemon_
     b->max_pokemon_per_trainer = (uint8_t)pokemon_per_trainer;
     return true;
 }
+bool d20_apply_template(D20Battle *b, int actor, const D20ActorTemplate *t)
+{
+    D20Unit *u;
+    if (!b || !t || b->started || actor < 0 || actor >= b->count ||
+        t->hp <= 0 || t->ac <= 0 || t->ac > 30 ||
+        t->proficiency == 0 || t->proficiency > 9 ||
+        t->speed_feet == 0 || t->speed_feet > 120)
+        return false;
+    for (int i = 0; i < ABILITIES; i++)
+        if (t->stats[i] < 1 || t->stats[i] > 30) return false;
+    u = &b->units[actor];
+    memcpy(u->stats, t->stats, sizeof(u->stats));
+    u->hp = u->max_hp = t->hp;
+    u->ac = t->ac;
+    u->speed = d20_speed_tiles(t->speed_feet);
+    u->proficiency = t->proficiency;
+    return true;
+}
 int d20_mod(int s) { return s >= 10 ? (s - 10) / 2 : -((11 - s) / 2); }
 int d20_roll(D20Battle *b, int sides)
 {
