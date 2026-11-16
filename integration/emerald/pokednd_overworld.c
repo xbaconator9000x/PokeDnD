@@ -263,7 +263,7 @@ static void CleanupCombat(bool8 restorePlayer)
     }
     /* A natural encounter borrows the original NPC. Restore its tile and
      * preserve the actor, scripts and local ID; only debug sprites are ours. */
-    if (sRocketIsExisting && sActive && restorePlayer &&
+    if (sRocketIsExisting && sActive &&
         sMapGroup == gSaveBlock1Ptr->location.mapGroup &&
         sMapNum == gSaveBlock1Ptr->location.mapNum &&
         sRocketObjectId < OBJECT_EVENTS_COUNT &&
