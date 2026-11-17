@@ -209,6 +209,20 @@ class OutcomeReplayTests(unittest.TestCase):
         rows.insert(1, sample("baseline", 1, 0, 0, 0, 0, 0, 0, 0))
         self.assertRaisesRegex(ValueError, "out of order", outcomes.validate, rows)
 
+    def test_duplicate_native_input_checkpoint_rejected(self):
+        rows = good_trace()
+        rows.insert(2, rows[1].copy())
+        self.assertRaisesRegex(ValueError, "duplicate native input checkpoints",
+                               outcomes.validate, rows)
+
+    def test_skipped_native_input_ordinal_rejected(self):
+        rows = good_trace()
+        rows[1]["label"] = "victory-attack-2"
+        self.assertRaisesRegex(ValueError, "noncontiguous", outcomes.validate, rows)
+        rows = good_trace()
+        rows[6]["label"] = "defeat-turn-0"
+        self.assertRaisesRegex(ValueError, "noncontiguous", outcomes.validate, rows)
+
     def test_missing_register_rejected(self):
         rows = good_trace()
         rows[0].pop("last_outcome")
