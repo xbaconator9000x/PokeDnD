@@ -24,10 +24,14 @@ class ReplayWorkflowTests(unittest.TestCase):
         self.assertNotIn("download-artifact@", text)
         self.assertNotIn("run-id:", text)
         self.assertNotIn("find rom ", text)
-        self.assertEqual(text.count("ci_field_replay.sh"), 2)
+        self.assertEqual(text.count("ci_field_replay.sh"), 4)
         self.assertIn('"$ROM" evidence/debug', text)
         self.assertIn('"$ROM" evidence/natural natural', text)
-        self.assertIn('test "$debug_status" = 0 && test "$natural_status" = 0', text)
+        self.assertIn('test "$debug_status" = 0 && test "$natural_status" = 0 && test "$victory_status" = 0 && test "$defeat_status" = 0', text)
+        self.assertIn("POKEDND_NATURAL_SCENARIO=victory", text)
+        self.assertIn("POKEDND_NATURAL_SCENARIO=defeat", text)
+        self.assertIn("evidence/natural-victory natural", text)
+        self.assertIn("evidence/natural-defeat natural", text)
         self.assertEqual(text.count("actions/upload-artifact@"), 1)
 
     def test_authored_encounter_runs_before_debug_inputs(self):
