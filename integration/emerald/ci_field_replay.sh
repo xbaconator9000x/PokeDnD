@@ -73,6 +73,67 @@ for attempt in 1 2 3 4; do
 done
 sleep 2; snap 03-after-title-select
 sleep 10; snap 04-world-candidate
+# Run the authored encounter in a separate cold emulator session.
+# No debug battle, dynamic allocation chord, or inherited reset state.
+if [ "${3:-debug}" = "natural" ]; then
+  sample natural-baseline
+  key Down
+  sleep 1; snap 05-authored-rocket-facing
+  key x
+sleep 2; snap 24-facing-a-natural-encounter
+sample natural-start
+python3 - "$OUT/runtime-probe.csv" <<'CHECKNATIVE'
+import csv, sys
+with open(sys.argv[1], newline="") as handle:
+    row = list(csv.DictReader(handle))[-1]
+if (int(row["natural_encounter_count"]) != 1 or
+    int(row["last_natural_local_id"]) != 5 or
+    int(row["diagnostic_state"]) != 1 or
+    int(row["start_failure"]) != 0):
+    raise SystemExit("FAIL: facing-A fixture did not start a native Rocket encounter")
+print("PASS: live mGBA facing-A activated existing native Rocket object event")
+CHECKNATIVE
+key BackSpace
+sleep 1; snap 25-natural-cancelled
+sample natural-cancelled
+python3 - "$OUT/runtime-probe.csv" <<'CHECKNATIVECANCEL'
+import csv, sys
+with open(sys.argv[1], newline="") as handle:
+    row = list(csv.DictReader(handle))[-1]
+if int(row["diagnostic_state"]) != 4 or int(row["natural_encounter_count"]) != 1:
+    raise SystemExit("FAIL: natural encounter cancellation did not preserve attribution")
+if int(row["natural_cleanup_status"]) != 1:
+    raise SystemExit("FAIL: original Rocket NPC identity was not preserved on cleanup")
+print("PASS: native Rocket encounter cancelled without resetting attribution")
+CHECKNATIVECANCEL
+# The restored Rocket may occupy the tile to the right. Try ordinary
+# directions and stop on the first observed real movement.
+for direction in Right Left Up Down; do
+  key "$direction"
+  sleep 2
+  note="natural-resumed-$direction"
+  snap "26-$note"
+  sample "$note"
+  if python3 - "$OUT/runtime-probe.csv" <<'CHECKMOVE'
+import csv, sys
+with open(sys.argv[1], newline="") as handle:
+    row = list(csv.DictReader(handle))[-1]
+raise SystemExit(0 if int(row["post_cancel_moves"]) >= 1 else 1)
+CHECKMOVE
+  then break; fi
+done
+python3 - "$OUT/runtime-probe.csv" <<'CHECKNATIVERESUME'
+import csv, sys
+with open(sys.argv[1], newline="") as handle:
+    row = list(csv.DictReader(handle))[-1]
+if int(row["post_cancel_moves"]) < 1:
+    raise SystemExit("FAIL: native Rocket encounter did not restore field movement")
+print("PASS: native facing-A Rocket encounter restored real field movement")
+CHECKNATIVERESUME
+  sha256sum "$ROM" | awk '{print $1}' > "$OUT/rom-sha256.txt"
+  printf '%s\n' "PASS: authored Oldale NPC, ordinary A, retreat and field movement" > "$OUT/NATIVE_AUTHORED_REPLAY_ACCEPTED.txt"
+  exit 0
+fi
 # Discover where the native flow reaches after quickstart. Capture evidence.
 for k in Left Left Down Down Right Down; do
   key "$k"; sleep 1
@@ -250,147 +311,6 @@ if int(current["diagnostic_state"]) not in (4, 5):
     raise SystemExit("FAIL: pre-fixture field unexpectedly entered combat")
 print("PASS: retained battle history and idle D20 state before Rocket fixture")
 CHECKFIELD
-# Native source-only fixture: R+SELECT creates a Rocket NPC ahead.
-# Never press L+R+SELECT+START: it is the GBA soft-reset chord, which
-# wipes EWRAM telemetry and returns the emulator to its boot sequence.
-# Facing-A then tests normal native NPC interaction.
-xdotool keydown --window "$WINDOW" s
-key BackSpace
-xdotool keyup --window "$WINDOW" s
-sleep 1; snap 23-replay-rocket-fixture
-sample fixture-spawn
-# Field locks can outlive post-defeat waits, and a recovered player can
-# face an occupied tile. Retry genuine field movement and recheck admission;
-# neither lock nor occupancy is evidence that a Rocket was spawned.
-for retry in 1 2 3 4; do
-  status=$(python3 - "$OUT/runtime-probe.csv" <<'STATUS'
-import csv, sys
-with open(sys.argv[1], newline="") as handle:
-    print(list(csv.DictReader(handle))[-1]["replay_fixture_status"])
-STATUS
-)
-  if [ "$status" != "1" ] && [ "$status" != "3" ] && [ "$status" != "4" ]; then break; fi
-  # Never send B as a generic field-recovery key: after Emerald has
-  # resumed, it can interact with a menu rather than dismiss one. In the
-  # previous native run, the third recovery entered a blank/reset-like
-  # screen and zeroed all EWRAM probe fields. Preserve that evidence.
-  # On occupancy, deliberately change the player's facing with D-pad
-  # input; on a lock, allow the field callback to settle before moving.
-  if [ "$status" = "1" ]; then
-    sleep 2
-    key Left
-    sleep 1
-    key Right
-  else
-    case "$retry" in
-      1) key Up ;;
-      2) key Down ;;
-      3) key Left ;;
-      4) key Right ;;
-    esac
-  fi
-  sleep 2
-  snap "23a-field-recovery-$retry"
-  sample "field-recovery-$retry"
-  # Detect resets/crashes before issuing another fixture chord. A blank
-  # probe state must never be interpreted as successful recovery.
-  python3 - "$OUT/runtime-probe.csv" <<'CHECKRECOVERY'
-import csv, sys
-with open(sys.argv[1], newline="") as handle:
-    rows = list(csv.DictReader(handle))
-before = next((r for r in reversed(rows) if r["label"] == "defeat-resumed"), None)
-current = rows[-1]
-if before is None:
-    raise SystemExit("FAIL: missing defeat-resumed native baseline")
-if int(current["trigger_count"]) < int(before["trigger_count"]):
-    raise SystemExit("FAIL: native field recovery lost EWRAM battle counters; possible emulator reset")
-CHECKRECOVERY
-  xdotool keydown --window "$WINDOW" s
-  key BackSpace
-  xdotool keyup --window "$WINDOW" s
-  sleep 1
-  snap "23b-fixture-retry-$retry"
-  sample "fixture-retry-$retry"
-  # A reset after a fixture chord must be diagnosed at the exact attempt,
-  # not mistaken for a fresh idle field or a missing chord.
-  python3 - "$OUT/runtime-probe.csv" <<'CHECKPOSTCHORD'
-import csv, sys
-with open(sys.argv[1], newline="") as handle:
-    rows = list(csv.DictReader(handle))
-before = next((r for r in reversed(rows) if r["label"] == "defeat-resumed"), None)
-current = rows[-1]
-if before is None or int(current["trigger_count"]) < int(before["trigger_count"]):
-    raise SystemExit("FAIL: native fixture chord lost battle history; probable emulator reset")
-if int(current["replay_fixture_attempt_count"]) < 1:
-    raise SystemExit("FAIL: native fixture chord was not admitted by overworld input")
-CHECKPOSTCHORD
-done
-python3 - "$OUT/runtime-probe.csv" <<'CHECKFIXTURE'
-import csv, sys
-with open(sys.argv[1], newline="") as handle:
-    row = list(csv.DictReader(handle))[-1]
-status = int(row["replay_fixture_status"])
-if status != 6:
-    raise SystemExit(
-        f"FAIL: Rocket fixture status {status} "
-        "(0=no chord, 1=locked, 2=facing, 3=blocked, 4=occupied, 5=allocation/identity, 7=wrong placement); "
-        f"native attempts={row['replay_fixture_attempt_count']}, "
-        f"field lock observations={row['replay_fixture_lock_count']}. "
-        "Do not bypass Emerald's field-control lock to manufacture a pass."
-    )
-print("PASS: native Emerald allocated a real Rocket fixture object event")
-CHECKFIXTURE
-key x
-sleep 2; snap 24-facing-a-natural-encounter
-sample natural-start
-python3 - "$OUT/runtime-probe.csv" <<'CHECKNATIVE'
-import csv, sys
-with open(sys.argv[1], newline="") as handle:
-    row = list(csv.DictReader(handle))[-1]
-if (int(row["natural_encounter_count"]) != 1 or
-    int(row["last_natural_local_id"]) != 230 or
-    int(row["diagnostic_state"]) != 1 or
-    int(row["start_failure"]) != 0):
-    raise SystemExit("FAIL: facing-A fixture did not start a native Rocket encounter")
-print("PASS: live mGBA facing-A activated existing native Rocket object event")
-CHECKNATIVE
-key BackSpace
-sleep 1; snap 25-natural-cancelled
-sample natural-cancelled
-python3 - "$OUT/runtime-probe.csv" <<'CHECKNATIVECANCEL'
-import csv, sys
-with open(sys.argv[1], newline="") as handle:
-    row = list(csv.DictReader(handle))[-1]
-if int(row["diagnostic_state"]) != 4 or int(row["natural_encounter_count"]) != 1:
-    raise SystemExit("FAIL: natural encounter cancellation did not preserve attribution")
-if int(row["natural_cleanup_status"]) != 1:
-    raise SystemExit("FAIL: original Rocket NPC identity was not preserved on cleanup")
-print("PASS: native Rocket encounter cancelled without resetting attribution")
-CHECKNATIVECANCEL
-# The restored Rocket may occupy the tile to the right. Try ordinary
-# directions and stop on the first observed real movement.
-for direction in Right Left Up Down; do
-  key "$direction"
-  sleep 2
-  note="natural-resumed-$direction"
-  snap "26-$note"
-  sample "$note"
-  if python3 - "$OUT/runtime-probe.csv" <<'CHECKMOVE'
-import csv, sys
-with open(sys.argv[1], newline="") as handle:
-    row = list(csv.DictReader(handle))[-1]
-raise SystemExit(0 if int(row["post_cancel_moves"]) >= 1 else 1)
-CHECKMOVE
-  then break; fi
-done
-python3 - "$OUT/runtime-probe.csv" <<'CHECKNATIVERESUME'
-import csv, sys
-with open(sys.argv[1], newline="") as handle:
-    row = list(csv.DictReader(handle))[-1]
-if int(row["post_cancel_moves"]) < 1:
-    raise SystemExit("FAIL: native Rocket encounter did not restore field movement")
-print("PASS: native facing-A Rocket encounter restored real field movement")
-CHECKNATIVERESUME
 # Preserve the exact ROM identity and reproducible input sequence alongside frames.
 # A replay of a stale ROM cannot establish acceptance of the current source HEAD.
 sha256sum "$ROM" | awk '{print $1}' > "$OUT/rom-sha256.txt"
