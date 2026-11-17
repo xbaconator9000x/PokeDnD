@@ -126,12 +126,18 @@ class EmeraldFieldBootTests(TestCase):
         ):
             with self.subTest(guard=required):
                 self.assertIn(required, handler)
+        # Scenario selection is replay-only; the ordinary build must retain
+        # standard difficulty and all actor-state guards must precede combat.
         self.assertLess(handler.index("obj->singleMovementActive"),
-                        handler.index("StartCombat(D20_SCENARIO_STANDARD, i)"))
+                        handler.index("StartCombat(scenario, i)"))
+        self.assertIn("u8 scenario = D20_SCENARIO_STANDARD;", handler)
+        self.assertIn("#ifdef POKEDND_NATIVE_REPLAY_ROCKET", handler)
+        self.assertIn("scenario = D20_SCENARIO_VICTORY;", handler)
+        self.assertIn("scenario = D20_SCENARIO_DEFEAT;", handler)
         self.assertNotIn("AbsCoord(", handler)
         self.assertIn("gPokeDnDNaturalEncounterCount++", handler)
         self.assertIn("gPokeDnDLastNaturalLocalId = localId", handler)
-        self.assertIn("StartCombat(D20_SCENARIO_STANDARD, i)", handler)
+        self.assertIn("StartCombat(scenario, i)", handler)
 
     def test_check_only_does_not_mutate_upstream(self):
         with tempfile.TemporaryDirectory() as tmp:
