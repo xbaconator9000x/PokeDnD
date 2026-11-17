@@ -86,10 +86,9 @@ checks now require distinct live samples for command and attack before
 cancellation; these stronger checks must pass at their own exact HEAD.
 Evidence: https://github.com/xbaconator9000x/PokeDnD/actions/runs/43707170926
 
-Remaining gameplay acceptance: visible turn/initiative/HP feedback, a clear
-attack animation or message, observable damage/defeat, and independently
-confirmed map movement after cancellation. A green compile, screen recording
-or synthesized CSV must never be substituted for actual mGBA state reads.
+Later exact-head native replay acceptance at commit `1accaf7eebb7b56d5587ff6c4a43d3e0147b03c5` passed all four workflows, including input-driven debug, natural Rocket retreat, victory and defeat. The native outcome validator requires separate attack/turn checkpoints, HP-based terminal damage, result acknowledgement, sprite hit-reaction counters, cleanup and one subsequent overworld movement step. Evidence: https://github.com/xbaconator9000x/PokeDnD/actions/runs/44098534974
+
+**Acceptance boundary:** GitHub reports native input/EWRAM validation success, but the uploaded LCD frames have not yet been independently inspected. The replay-only Oldale warp and victory/defeat modifiers are test fixtures, not default production gameplay. Resource-budget measurements and SRD versus homebrew rules provenance remain to be documented before roadmap issue #3 can be checked off. A passing validator or compilation is not a substitute for reviewing native LCD images.
 
 No private ROM bytes, Shattered assets, saves, keys or copyrighted sprite
 assets are committed here. Build artifacts are held privately for seven days.
