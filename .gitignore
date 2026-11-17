@@ -1,0 +1,14 @@
+build/
+*.gba
+*.sav
+*.sgm
+*.state
+*.rom
+*.nds
+*.bin
+*.elf
+*.map
+*.o
+*.key
+.env
+.env.*
