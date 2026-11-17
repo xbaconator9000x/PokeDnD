@@ -55,8 +55,17 @@ jobs:
         run: |
           ROM=$(find upstream -maxdepth 1 -type f -name '*.gba' | head -n 1)
           test -s "$ROM"
+          # Both sessions run even if one fails; each has its own process,
+          # GDB collector and evidence directory.
+          set +e
           POKEDND_ELF=upstream/pokeemerald.elf timeout 245s xvfb-run -a -s "-screen 0 800x600x24" \
-            bash integration/emerald/ci_field_replay.sh "$ROM" evidence
+            bash integration/emerald/ci_field_replay.sh "$ROM" evidence/debug
+          debug_status=$?
+          POKEDND_ELF=upstream/pokeemerald.elf timeout 150s xvfb-run -a -s "-screen 0 800x600x24" \
+            bash integration/emerald/ci_field_replay.sh "$ROM" evidence/natural natural
+          natural_status=$?
+          echo "Debug status=$debug_status; authored encounter status=$natural_status"
+          test "$debug_status" = 0 && test "$natural_status" = 0
       - name: Retain emulator evidence
         if: always()
         uses: actions/upload-artifact@v4
