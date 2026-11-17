@@ -769,7 +769,18 @@ static bool8 TryRocketFieldEncounter(u16 newKeys)
         /* StartCombat may allocate sprites and freeze actors. Capture the
          * source NPC identity before those allocations can reuse slots. */
         const u8 localId = obj->localId;
-        if (StartCombat(D20_SCENARIO_STANDARD, i)) {
+        /* Replay-only encounter difficulty selection exercises real native
+         * victory/defeat paths from the same authored NPC. The production
+         * encounter always uses standard stats. Holding a direction while
+         * pressing A is a CI fixture parameter, not a combat shortcut. */
+        u8 scenario = D20_SCENARIO_STANDARD;
+#ifdef POKEDND_NATIVE_REPLAY_ROCKET
+        if (gMain.heldKeys & DPAD_UP)
+            scenario = D20_SCENARIO_VICTORY;
+        else if (gMain.heldKeys & DPAD_DOWN)
+            scenario = D20_SCENARIO_DEFEAT;
+#endif
+        if (StartCombat(scenario, i)) {
             gPokeDnDTriggerCount++;
             gPokeDnDNaturalEncounterCount++;
             gPokeDnDLastNaturalLocalId = localId;
