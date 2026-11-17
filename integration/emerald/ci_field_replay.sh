@@ -77,9 +77,11 @@ sleep 10; snap 04-world-candidate
 # No debug battle, dynamic allocation chord, or inherited reset state.
 if [ "${3:-debug}" = "natural" ]; then
   sample natural-baseline
+  key Down
+  sleep 1; snap 05-authored-rocket-facing
   scenario="${POKEDND_NATURAL_SCENARIO:-standard}"
   case "$scenario" in
-    standard) key Down; sleep 1; snap 05-authored-rocket-facing; key x ;;
+    standard) key x ;;
     victory|defeat)
       direction=Up
       if [ "$scenario" = defeat ]; then direction=Down; fi
@@ -103,6 +105,55 @@ if (int(row["natural_encounter_count"]) != 1 or
     raise SystemExit("FAIL: facing-A fixture did not start a native Rocket encounter")
 print("PASS: live mGBA facing-A activated existing native Rocket object event")
 CHECKNATIVE
+if [ "$scenario" != standard ]; then
+  # Unlike the retreat scenario, these must resolve through real attack/AI
+  # turns, preserve the original NPC, acknowledge the result and move.
+  last_outcome() {
+    python3 - "$OUT/runtime-probe.csv" <<'NATOUT'
+import csv,sys
+with open(sys.argv[1],newline="") as f:
+    print(list(csv.DictReader(f))[-1]["last_outcome"])
+NATOUT
+  }
+  if [ "$scenario" = victory ]; then
+    key x; key z; key s
+    for attempt in 1 2 3 4 5; do
+      key x
+      sleep 1
+      snap "25-natural-victory-hit-$attempt"
+      sample "natural-victory-hit-$attempt"
+      if [ "$(last_outcome)" = 1 ]; then break; fi
+      key z; key z; key s
+    done
+    test "$(last_outcome)" = 1 || { echo "FAIL: natural Rocket victory did not resolve"; exit 1; }
+  else
+    for attempt in $(seq 1 12); do
+      key z
+      sleep 1
+      snap "25-natural-defeat-turn-$attempt"
+      sample "natural-defeat-turn-$attempt"
+      if [ "$(last_outcome)" = 2 ]; then break; fi
+    done
+    test "$(last_outcome)" = 2 || { echo "FAIL: natural Rocket defeat did not resolve"; exit 1; }
+  fi
+  key x
+  sleep 1
+  snap "25-natural-$scenario-acknowledged"
+  sample "natural-$scenario-acknowledged"
+  python3 - "$OUT/runtime-probe.csv" "$scenario" <<'NATTERMINAL'
+import csv,sys
+with open(sys.argv[1],newline="") as f:
+    row=list(csv.DictReader(f))[-1]
+expected=1 if sys.argv[2]=="victory" else 2
+if (int(row["last_outcome"]) != expected or
+    int(row["diagnostic_state"]) != 5 or
+    int(row["natural_cleanup_status"]) != 1 or
+    int(row["natural_encounter_count"]) != 1 or
+    int(row["outcome_acks"]) < 1):
+    raise SystemExit("FAIL: native natural encounter terminal cleanup/ack")
+print("PASS: natural Rocket terminal outcome, acknowledgement and NPC restoration")
+NATTERMINAL
+else
 key BackSpace
 sleep 1; snap 25-natural-cancelled
 sample natural-cancelled
@@ -116,6 +167,7 @@ if int(row["natural_cleanup_status"]) != 1:
     raise SystemExit("FAIL: original Rocket NPC identity was not preserved on cleanup")
 print("PASS: native Rocket encounter cancelled without resetting attribution")
 CHECKNATIVECANCEL
+fi
 # The restored Rocket may occupy the tile to the right. Try ordinary
 # directions and stop on the first observed real movement.
 for direction in Right Left Up Down; do
