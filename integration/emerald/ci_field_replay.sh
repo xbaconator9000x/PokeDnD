@@ -98,7 +98,7 @@ assert_no_natural_encounter
 # mGBA SDL default: L=A, R=S, START=Return, Pokémon A=X, B=Z.
 xdotool keydown --window "$WINDOW" a
 xdotool keydown --window "$WINDOW" s
-key BackSpace
+key Return
 xdotool keyup --window "$WINDOW" s
 xdotool keyup --window "$WINDOW" a
 sleep 2; snap 06-after-combat-chord
@@ -306,7 +306,7 @@ if int(current["trigger_count"]) < int(before["trigger_count"]):
     raise SystemExit("FAIL: native field recovery lost EWRAM battle counters; possible emulator reset")
 CHECKRECOVERY
   xdotool keydown --window "$WINDOW" s
-  key Return
+  key BackSpace
   xdotool keyup --window "$WINDOW" s
   sleep 1
   snap "23b-fixture-retry-$retry"
