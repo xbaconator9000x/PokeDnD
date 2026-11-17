@@ -41,6 +41,22 @@ def good_trace():
 
 
 class OutcomeReplayTests(unittest.TestCase):
+    def test_native_scenario_modifiers_do_not_move_player(self):
+        actor = (ROOT / "integration/emerald/pokednd_overworld.c").read_text()
+        replay = (ROOT / "integration/emerald/ci_field_replay.sh").read_text()
+        natural = actor.split("static bool8 TryRocketFieldEncounter", 1)[1].split(
+            "bool8 PokeDnD_HandleOverworldInput", 1)[0]
+        self.assertIn("(gMain.heldKeys & (L_BUTTON | R_BUTTON)) == L_BUTTON", natural)
+        self.assertIn("(gMain.heldKeys & (L_BUTTON | R_BUTTON)) == R_BUTTON", natural)
+        self.assertNotIn("gMain.heldKeys & DPAD_UP", natural)
+        self.assertNotIn("gMain.heldKeys & DPAD_DOWN", natural)
+        interaction = replay.split('if [ "${3:-debug}" = "natural" ]; then', 1)[1].split(
+            "sample natural-start", 1)[0]
+        self.assertIn('modifier=a', interaction)
+        self.assertIn('if [ "$scenario" = defeat ]; then modifier=s; fi', interaction)
+        self.assertNotIn('direction=Up', interaction)
+        self.assertNotIn('direction=Down', interaction)
+
     def test_real_ordered_victory_and_defeat_accepted(self):
         self.assertTrue(outcomes.validate(good_trace()).startswith("PASS"))
 
