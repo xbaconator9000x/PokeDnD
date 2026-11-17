@@ -114,8 +114,14 @@ class ReplayWorkflowTests(unittest.TestCase):
         self.assertIn("u8 scenario = D20_SCENARIO_STANDARD;", source)
         self.assertIn("if (StartCombat(scenario, i))", source)
         self.assertIn("#ifdef POKEDND_NATIVE_REPLAY_ROCKET", source)
-        self.assertIn("gMain.heldKeys & L_BUTTON", source)
-        self.assertIn("gMain.heldKeys & R_BUTTON", source)
+        # Match the actual bitmask selection, not an obsolete individual-key spelling.
+        # Both modifiers together must fall back to the standard encounter.
+        self.assertIn("(gMain.heldKeys & (L_BUTTON | R_BUTTON)) == L_BUTTON", source)
+        self.assertIn("(gMain.heldKeys & (L_BUTTON | R_BUTTON)) == R_BUTTON", source)
+        self.assertIn("scenario = D20_SCENARIO_VICTORY;", source)
+        self.assertIn("scenario = D20_SCENARIO_DEFEAT;", source)
+        self.assertIn("u8 scenario = D20_SCENARIO_STANDARD;", source)
+        self.assertIn("if (StartCombat(scenario, i))", source)
         self.assertNotIn("gMain.heldKeys & DPAD_UP", source.split("static bool8 TryRocketFieldEncounter", 1)[1].split("bool8 PokeDnD_HandleOverworldInput", 1)[0])
         self.assertIn("return FALSE;\n    }\n    return FALSE;\n}\nbool8 PokeDnD_HandleOverworldInput", source)
 
