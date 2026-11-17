@@ -20,8 +20,11 @@ REQUIRED = (
 def validate(rows):
     if not rows:
         raise ValueError("no live EWRAM samples")
-    if set(REQUIRED) - set(rows[0]):
-        raise ValueError("missing native outcome or HP registers")
+    for index, row in enumerate(rows):
+        missing = set(REQUIRED) - set(row)
+        if missing or any(row[column] is None or not str(row[column]).strip()
+                          for column in REQUIRED):
+            raise ValueError("missing native outcome or HP registers at sample " + str(index))
     standard_labels = ("baseline", "started", "deployed", "turn",
                        "commanded", "attacked", "dashed", "cancelled", "resumed")
     # The live debugger CSV contains the preceding standard encounter too.
@@ -39,7 +42,10 @@ def validate(rows):
     for row in rows:
         sample = {"label": row["label"]}
         for column in REQUIRED[1:]:
-            sample[column] = int(row[column], 0)
+            try:
+                sample[column] = int(row[column], 0)
+            except (ValueError, TypeError) as error:
+                raise ValueError("invalid native register " + column + " at " + row["label"]) from error
             if sample[column] < 0:
                 raise ValueError("negative EWRAM value")
         parsed.append(sample)
