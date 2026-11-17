@@ -24,8 +24,23 @@ class ReplayWorkflowTests(unittest.TestCase):
         self.assertNotIn("download-artifact@", text)
         self.assertNotIn("run-id:", text)
         self.assertNotIn("find rom ", text)
-        self.assertEqual(text.count("ci_field_replay.sh"), 1)
+        self.assertEqual(text.count("ci_field_replay.sh"), 2)
+        self.assertIn('"$ROM" evidence/debug', text)
+        self.assertIn('"$ROM" evidence/natural natural', text)
+        self.assertIn('test "$debug_status" = 0 && test "$natural_status" = 0', text)
         self.assertEqual(text.count("actions/upload-artifact@"), 1)
+
+    def test_authored_encounter_runs_before_debug_inputs(self):
+        script = (ROOT / "integration/emerald/ci_field_replay.sh").read_text()
+        natural = script.split('if [ "${3:-debug}" = "natural" ]; then', 1)[1].split("\nfi\n", 1)[0]
+        self.assertIn("key Down", natural)
+        self.assertIn("key x", natural)
+        self.assertIn('int(row["last_natural_local_id"]) != 5', natural)
+        self.assertIn("natural_cleanup_status", natural)
+        self.assertIn("post_cancel_moves", natural)
+        self.assertNotIn("fixture-retry", natural)
+        self.assertNotIn("keydown", natural)
+        self.assertIn("NATIVE_AUTHORED_REPLAY_ACCEPTED.txt", natural)
 
     def test_replay_runs_on_integration_changes(self):
         text = WORKFLOW.read_text()
