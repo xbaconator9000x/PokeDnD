@@ -250,18 +250,13 @@ if int(current["diagnostic_state"]) not in (4, 5):
     raise SystemExit("FAIL: pre-fixture field unexpectedly entered combat")
 print("PASS: retained battle history and idle D20 state before Rocket fixture")
 CHECKFIELD
-# Native source-only fixture: L+R+SELECT+START places an upstream Rocket
-# immediately in front of the player, using the same already exercised
-# L+R+START input path as debug encounters with SELECT as a fixture qualifier.
-# Pressing A then uses normal facing-direction NPC interaction.
-# This is not evidence of an authored Rocket map encounter.
-xdotool keydown --window "$WINDOW" a
+# Native source-only fixture: R+START creates a Rocket NPC ahead.
+# Never press L+R+SELECT+START: it is the GBA soft-reset chord, which
+# wipes EWRAM telemetry and returns the emulator to its boot sequence.
+# Facing-A then tests normal native NPC interaction.
 xdotool keydown --window "$WINDOW" s
-xdotool keydown --window "$WINDOW" BackSpace
 key Return
-xdotool keyup --window "$WINDOW" BackSpace
 xdotool keyup --window "$WINDOW" s
-xdotool keyup --window "$WINDOW" a
 sleep 1; snap 23-replay-rocket-fixture
 sample fixture-spawn
 # Field locks can outlive post-defeat waits, and a recovered player can
@@ -310,13 +305,9 @@ if before is None:
 if int(current["trigger_count"]) < int(before["trigger_count"]):
     raise SystemExit("FAIL: native field recovery lost EWRAM battle counters; possible emulator reset")
 CHECKRECOVERY
-  xdotool keydown --window "$WINDOW" a
   xdotool keydown --window "$WINDOW" s
-  xdotool keydown --window "$WINDOW" BackSpace
   key Return
-  xdotool keyup --window "$WINDOW" BackSpace
   xdotool keyup --window "$WINDOW" s
-  xdotool keyup --window "$WINDOW" a
   sleep 1
   snap "23b-fixture-retry-$retry"
   sample "fixture-retry-$retry"
