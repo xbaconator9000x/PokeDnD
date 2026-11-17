@@ -257,6 +257,25 @@ class OutcomeReplayTests(unittest.TestCase):
                 self.assertRaisesRegex(ValueError, "native (outcome or HP registers|register)",
                                        outcomes.validate, rows)
 
+    def test_outcome_register_overflow_rejected_at_every_phase(self):
+        # GDB samples are unsigned 32-bit EWRAM words. Python integers do not
+        # overflow, so an impossible trace must not satisfy combat acceptance.
+        for index in range(len(good_trace())):
+            for column in outcomes.REQUIRED[1:]:
+                with self.subTest(index=index, column=column):
+                    rows = good_trace()
+                    rows[index][column] = "0x100000000"
+                    self.assertRaisesRegex(
+                        ValueError, "out-of-range native EWRAM register",
+                        outcomes.validate, rows)
+
+    def test_outcome_negative_register_rejected(self):
+        rows = good_trace()
+        rows[7]["impact_frames"] = "-1"
+        self.assertRaisesRegex(
+            ValueError, "out-of-range native EWRAM register",
+            outcomes.validate, rows)
+
     def test_missing_register_rejected(self):
         rows = good_trace()
         rows[0].pop("last_outcome")
