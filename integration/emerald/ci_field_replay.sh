@@ -263,9 +263,19 @@ sample victory-result
 key x
 sleep 1; snap 17-victory-confirmed
 sample victory-confirmed
-key Right
-sleep 2; snap 18-victory-returned-field
-sample victory-resumed
+# A restored field may face a wall or NPC. Exercise ordinary directional
+# input before the single canonical acceptance sample. Never infer movement
+# from LCD changes alone.
+resume_field() {
+  local label="$1" frame="$2" direction
+  for direction in Right Left Up Down; do
+    key "$direction"
+    sleep 1
+  done
+  snap "$frame"
+  sample "$label"
+}
+resume_field victory-resumed 18-victory-returned-field
 
 chord_with_direction Down
 sleep 2; snap 19-defeat-debug-entry
@@ -284,9 +294,7 @@ sample defeat-result
 key x
 sleep 1; snap 21-defeat-confirmed
 sample defeat-confirmed
-key Right
-sleep 2; snap 22-defeat-returned-field
-sample defeat-resumed
+resume_field defeat-resumed 22-defeat-returned-field
 python3 integration/emerald/validate_outcome_replay.py "$OUT/runtime-probe.csv" "$OUT"
 assert_no_natural_encounter
 # After the defeat replay, exercise ordinary Emerald D-pad input before
