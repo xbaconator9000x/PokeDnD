@@ -311,6 +311,19 @@ CHECKRECOVERY
   sleep 1
   snap "23b-fixture-retry-$retry"
   sample "fixture-retry-$retry"
+  # A reset after a fixture chord must be diagnosed at the exact attempt,
+  # not mistaken for a fresh idle field or a missing chord.
+  python3 - "$OUT/runtime-probe.csv" <<'CHECKPOSTCHORD'
+import csv, sys
+with open(sys.argv[1], newline="") as handle:
+    rows = list(csv.DictReader(handle))
+before = next((r for r in reversed(rows) if r["label"] == "defeat-resumed"), None)
+current = rows[-1]
+if before is None or int(current["trigger_count"]) < int(before["trigger_count"]):
+    raise SystemExit("FAIL: native fixture chord lost battle history; probable emulator reset")
+if int(current["replay_fixture_attempt_count"]) < 1:
+    raise SystemExit("FAIL: native fixture chord was not admitted by overworld input")
+CHECKPOSTCHORD
 done
 python3 - "$OUT/runtime-probe.csv" <<'CHECKFIXTURE'
 import csv, sys
