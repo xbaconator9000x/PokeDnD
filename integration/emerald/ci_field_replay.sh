@@ -193,7 +193,7 @@ if int(row["post_cancel_moves"]) < 1:
 print("PASS: native facing-A Rocket encounter restored real field movement")
 CHECKNATIVERESUME
   sha256sum "$ROM" | awk '{print $1}' > "$OUT/rom-sha256.txt"
-  printf '%s\n' "PASS: authored Oldale NPC, ordinary A, retreat and field movement" > "$OUT/NATIVE_AUTHORED_REPLAY_ACCEPTED.txt"
+  printf '%s\n' "PASS: authored Oldale NPC, ordinary A, ${scenario} resolution and field movement" > "$OUT/NATIVE_AUTHORED_REPLAY_ACCEPTED.txt"
   exit 0
 fi
 # Discover where the native flow reaches after quickstart. Capture evidence.
