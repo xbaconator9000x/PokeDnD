@@ -77,9 +77,19 @@ sleep 10; snap 04-world-candidate
 # No debug battle, dynamic allocation chord, or inherited reset state.
 if [ "${3:-debug}" = "natural" ]; then
   sample natural-baseline
-  key Down
-  sleep 1; snap 05-authored-rocket-facing
-  key x
+  scenario="${POKEDND_NATURAL_SCENARIO:-standard}"
+  case "$scenario" in
+    standard) key Down; sleep 1; snap 05-authored-rocket-facing; key x ;;
+    victory|defeat)
+      direction=Up
+      if [ "$scenario" = defeat ]; then direction=Down; fi
+      xdotool keydown --window "$WINDOW" "$direction"
+      sleep 0.25
+      key x
+      xdotool keyup --window "$WINDOW" "$direction"
+      ;;
+    *) echo "Invalid natural replay scenario: $scenario" >&2; exit 2 ;;
+  esac
 sleep 2; snap 24-facing-a-natural-encounter
 sample natural-start
 python3 - "$OUT/runtime-probe.csv" <<'CHECKNATIVE'
