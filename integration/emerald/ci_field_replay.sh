@@ -98,7 +98,7 @@ assert_no_natural_encounter
 # mGBA SDL default: L=A, R=S, START=Return, Pokémon A=X, B=Z.
 xdotool keydown --window "$WINDOW" a
 xdotool keydown --window "$WINDOW" s
-key Return
+key BackSpace
 xdotool keyup --window "$WINDOW" s
 xdotool keyup --window "$WINDOW" a
 sleep 2; snap 06-after-combat-chord
@@ -250,12 +250,12 @@ if int(current["diagnostic_state"]) not in (4, 5):
     raise SystemExit("FAIL: pre-fixture field unexpectedly entered combat")
 print("PASS: retained battle history and idle D20 state before Rocket fixture")
 CHECKFIELD
-# Native source-only fixture: R+START creates a Rocket NPC ahead.
+# Native source-only fixture: R+SELECT creates a Rocket NPC ahead.
 # Never press L+R+SELECT+START: it is the GBA soft-reset chord, which
 # wipes EWRAM telemetry and returns the emulator to its boot sequence.
 # Facing-A then tests normal native NPC interaction.
 xdotool keydown --window "$WINDOW" s
-key Return
+key BackSpace
 xdotool keyup --window "$WINDOW" s
 sleep 1; snap 23-replay-rocket-fixture
 sample fixture-spawn
