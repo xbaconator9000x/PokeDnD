@@ -223,6 +223,19 @@ class OutcomeReplayTests(unittest.TestCase):
         rows[6]["label"] = "defeat-turn-0"
         self.assertRaisesRegex(ValueError, "noncontiguous", outcomes.validate, rows)
 
+    def test_late_checkpoint_missing_register_rejected(self):
+        rows = good_trace()
+        rows[8].pop("last_enemy_hp")
+        self.assertRaisesRegex(ValueError, "sample 8", outcomes.validate, rows)
+
+    def test_blank_or_malformed_native_register_rejected(self):
+        for value in ("", "  ", "not-a-number", None):
+            with self.subTest(value=value):
+                rows = good_trace()
+                rows[6]["last_human_hp"] = value
+                self.assertRaisesRegex(ValueError, "native (outcome or HP registers|register)",
+                                       outcomes.validate, rows)
+
     def test_missing_register_rejected(self):
         rows = good_trace()
         rows[0].pop("last_outcome")
