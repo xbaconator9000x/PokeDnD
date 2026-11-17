@@ -36,12 +36,17 @@ class ReplayWorkflowTests(unittest.TestCase):
 
     def test_authored_encounter_runs_before_debug_inputs(self):
         script = (ROOT / "integration/emerald/ci_field_replay.sh").read_text()
-        natural = script.split('if [ "${3:-debug}" = "natural" ]; then', 1)[1].split("\nfi\n", 1)[0]
+        natural = script.split('if [ "${3:-debug}" = "natural" ]; then', 1)[1].split("# Discover where the native flow reaches after quickstart.", 1)[0]
         self.assertIn("key Down", natural)
         self.assertIn("key x", natural)
         self.assertIn('int(row["last_natural_local_id"]) != 5', natural)
         self.assertIn("natural_cleanup_status", natural)
         self.assertIn("post_cancel_moves", natural)
+        self.assertIn('if [ "$scenario" != standard ]; then', natural)
+        self.assertIn('if [ "$scenario" = victory ]; then', natural)
+        self.assertIn('if [ "$(last_outcome)" = 2 ]; then break; fi', natural)
+        self.assertIn('if int(row["post_cancel_moves"]) < 1:', natural)
+        self.assertIn('exit 0', natural)
         self.assertIn("NATTERMINAL", natural)
         self.assertIn("natural_cleanup_status", natural)
         self.assertIn("outcome_acks", natural)
