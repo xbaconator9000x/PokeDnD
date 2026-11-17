@@ -64,8 +64,14 @@ jobs:
           POKEDND_ELF=upstream/pokeemerald.elf timeout 150s xvfb-run -a -s "-screen 0 800x600x24" \
             bash integration/emerald/ci_field_replay.sh "$ROM" evidence/natural natural
           natural_status=$?
-          echo "Debug status=$debug_status; authored encounter status=$natural_status"
-          test "$debug_status" = 0 && test "$natural_status" = 0
+          POKEDND_NATURAL_SCENARIO=victory POKEDND_ELF=upstream/pokeemerald.elf timeout 180s xvfb-run -a -s "-screen 0 800x600x24" \
+            bash integration/emerald/ci_field_replay.sh "$ROM" evidence/natural-victory natural
+          victory_status=$?
+          POKEDND_NATURAL_SCENARIO=defeat POKEDND_ELF=upstream/pokeemerald.elf timeout 180s xvfb-run -a -s "-screen 0 800x600x24" \
+            bash integration/emerald/ci_field_replay.sh "$ROM" evidence/natural-defeat natural
+          defeat_status=$?
+          echo "Debug=$debug_status; authored retreat=$natural_status; authored victory=$victory_status; authored defeat=$defeat_status"
+          test "$debug_status" = 0 && test "$natural_status" = 0 && test "$victory_status" = 0 && test "$defeat_status" = 0
       - name: Retain emulator evidence
         if: always()
         uses: actions/upload-artifact@v4
