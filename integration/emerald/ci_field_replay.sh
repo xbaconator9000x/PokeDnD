@@ -104,7 +104,14 @@ if (int(row["natural_encounter_count"]) != 1 or
     int(row["last_natural_local_id"]) != 5 or
     int(row["diagnostic_state"]) != 1 or
     int(row["start_failure"]) != 0):
-    raise SystemExit("FAIL: facing-A fixture did not start a native Rocket encounter")
+    raise SystemExit(
+        "FAIL: authored Rocket facing-A admission "
+        f"encounters={row['natural_encounter_count']} "
+        f"local_id={row['last_natural_local_id']} "
+        f"state={row['diagnostic_state']} "
+        f"start_failure={row['start_failure']} "
+        f"field_locks={row['replay_natural_lock_count']}"
+    )
 print("PASS: live mGBA facing-A activated existing native Rocket object event")
 CHECKNATIVE
 if [ "$scenario" != standard ]; then
