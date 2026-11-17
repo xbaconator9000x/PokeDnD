@@ -204,6 +204,27 @@ class OutcomeReplayTests(unittest.TestCase):
                      "attacked", "cancelled", "resumed")]
         self.assertTrue(outcomes.validate(standard + good_trace()).startswith("PASS"))
 
+    def test_standard_prefix_malformed_register_fails_closed(self):
+        labels = ("baseline", "started", "deployed", "turn", "commanded",
+                  "attacked", "cancelled", "resumed")
+        for index, value in ((0, "not-a-number"), (4, "-1"),
+                             (7, "4294967296")):
+            with self.subTest(index=index, value=value):
+                standard = [sample(label, 1, 0, 0, 0, 0, 0, 0, 0)
+                            for label in labels]
+                standard[index]["last_enemy_hp"] = value
+                self.assertRaisesRegex(
+                    ValueError, "standard native register",
+                    outcomes.validate, standard + good_trace())
+
+    def test_standard_prefix_valid_hex_registers_accepted(self):
+        labels = ("baseline", "started", "deployed", "turn", "commanded",
+                  "attacked", "cancelled", "resumed")
+        standard = [sample(label, 1, 0, 0, 0, 0, 0, 0, 0)
+                    for label in labels]
+        standard[2]["milestones"] = "0x3"
+        self.assertTrue(outcomes.validate(standard + good_trace()).startswith("PASS"))
+
     def test_misplaced_standard_checkpoint_rejected(self):
         rows = good_trace()
         rows.insert(1, sample("baseline", 1, 0, 0, 0, 0, 0, 0, 0))
