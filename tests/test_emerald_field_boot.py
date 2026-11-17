@@ -2,6 +2,7 @@
 
 These fixtures contain original test text only; no Pokémon ROM or game assets.
 """
+import json
 import importlib.util
 from pathlib import Path
 import tempfile
@@ -30,6 +31,11 @@ class EmeraldFieldBootTests(TestCase):
     def make_upstream(self, path: Path, warp: str = TRUCK):
         (path / "src").mkdir()
         (path / "include").mkdir()
+        map_dir = path / "data/maps/OldaleTown"
+        map_dir.mkdir(parents=True)
+        (map_dir / "map.json").write_text(json.dumps({
+            "id": "MAP_OLDALE_TOWN", "object_events": [{"x": i, "y": 1} for i in range(4)],
+            "warp_events": [], "coord_events": [], "bg_events": []}))
         (path / "src/overworld.c").write_text(OVERWORLD)
         (path / "src/new_game.c").write_text(
             "static void WarpToTruck(void)\n"
@@ -71,6 +77,25 @@ class EmeraldFieldBootTests(TestCase):
             self.assertNotIn(TRUCK, modified)
             self.assertIn("PokeDnD_HandleOverworldInput",
                           (root / "src/overworld.c").read_text())
+
+    def test_authored_fixture_preserves_original_events_and_normal_build(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.make_upstream(root)
+            path = root / "data/maps/OldaleTown/map.json"
+            original = path.read_text()
+            data = json.loads(apply.authored_replay_map(original))
+            self.assertEqual(data["object_events"][:4], json.loads(original)["object_events"])
+            self.assertEqual(len(data["object_events"]), 5)
+            self.assertEqual(data["object_events"][4]["graphics_id"], "OBJ_EVENT_GFX_ROCKET_M")
+            self.install(root)
+            self.assertEqual(path.read_text(), original)
+
+    def test_authored_fixture_rejects_conflicting_event(self):
+        data = {"id": "MAP_OLDALE_TOWN", "object_events": [{"x": i, "y": 1} for i in range(4)],
+                "warp_events": [{"x": 10, "y": 13}], "coord_events": [], "bg_events": []}
+        with self.assertRaisesRegex(RuntimeError, "conflicts"):
+            apply.authored_replay_map(json.dumps(data))
 
     def test_unknown_start_warp_fails_closed_without_partial_patch(self):
         with tempfile.TemporaryDirectory() as tmp:
