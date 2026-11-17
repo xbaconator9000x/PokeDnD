@@ -92,3 +92,25 @@ Later exact-head native replay acceptance at commit `1accaf7eebb7b56d5587ff6c4a4
 
 No private ROM bytes, Shattered assets, saves, keys or copyrighted sprite
 assets are committed here. Build artifacts are held privately for seven days.
+
+## GBA linked-memory budget (new acceptance gate)
+
+The native integration workflow now runs `tests/test_emerald_gba_memory.py` and
+`integration/emerald/audit_gba_memory.py` against the **actual pinned-upstream
+ARM ELF**. Its JSON evidence reports allocated EWRAM (256 KiB), IWRAM (32 KiB),
+VRAM (96 KiB) and OAM (1 KiB) section ranges, overlapping/overflowing allocations,
+and the sizes of named PokéDND RAM objects including `sBattle`. The audit fails
+closed if core combat or diagnostic symbols are absent. The JSON is source-derived
+build metadata, not proprietary ROM content.
+
+**Not yet measured:** peak stack/heap concurrency, dynamic sprite/OAM allocation,
+VRAM runtime ownership, VBlank timing, and gameplay performance. Linked ELF
+allocation alone cannot establish those runtime budgets; native mGBA acceptance
+and actual LCD review remain independent gates.
+
+**Rules provenance:** trainer-group initiative, paid Pokémon commands, automatic
+Dodge, species statistics and current encounter balance are experimental
+PokéDND prototype rules, **not** asserted to be D&D 2024 SRD 5.2.1 or
+source-verified Pokémon 5e (2024) mechanics. The C99 core must remain usable
+without Pokémon content; future optional-module rules require independent
+source/licence verification before being labelled canonical.
