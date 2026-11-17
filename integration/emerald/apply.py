@@ -8,9 +8,32 @@ from pathlib import Path
 import argparse
 import subprocess
 import shutil
+import json
 
 PIN = "4da9230cf7c1f1d7b0d47b45783b202666fffece"
 SOURCE = Path(__file__).resolve().parents[2]
+
+def authored_replay_map(original: str) -> str:
+    """Append one map-authored opponent; never change existing map IDs/events."""
+    data = json.loads(original)
+    if data.get("id") != "MAP_OLDALE_TOWN":
+        raise RuntimeError("Unexpected replay map identity")
+    objects = data["object_events"]
+    if len(objects) != 4:
+        raise RuntimeError("Pinned Oldale object count changed")
+    x, y = 10, 13
+    for kind in ("object_events", "warp_events", "coord_events", "bg_events"):
+        if any(e.get("x") == x and e.get("y") == y for e in data[kind]):
+            raise RuntimeError("Replay opponent location conflicts with existing map event")
+    objects.append({
+        "graphics_id": "OBJ_EVENT_GFX_ROCKET_M", "x": x, "y": y,
+        "elevation": 3, "movement_type": "MOVEMENT_TYPE_FACE_UP",
+        "movement_range_x": 0, "movement_range_y": 0,
+        "trainer_type": "TRAINER_TYPE_NONE", "trainer_sight_or_berry_tree_id": "0",
+        "script": "0", "flag": "0",
+    })
+    return json.dumps(data, indent=2) + "\n"
+
 
 def install(upstream: Path, *, check_only: bool = False, field_replay: bool = False):
     upstream = upstream.resolve()
@@ -70,11 +93,15 @@ def install(upstream: Path, *, check_only: bool = False, field_replay: bool = Fa
         if replay_original.count(original_warp) != 1:
             raise RuntimeError("Pinned truck start changed; refusing replay field warp")
         replay_modified = replay_original.replace(original_warp, replay_warp, 1)
+    replay_map = upstream / "data/maps/OldaleTown/map.json"
+    if field_replay:
+        map_modified = authored_replay_map(replay_map.read_text(encoding="utf-8"))
     if check_only:
         print("PASS: upstream SHA, hook anchors and replay warp verified")
         return
     if field_replay:
         replay_target.write_text(replay_modified, encoding="utf-8")
+        replay_map.write_text(map_modified, encoding="utf-8")
     target.write_text(content.replace(include_anchor, include_replacement, 1)
                               .replace(anchor, modified, 1), encoding="utf-8")
     for dest, origin in target_files.items():
