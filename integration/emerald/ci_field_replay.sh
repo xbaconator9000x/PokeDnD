@@ -110,7 +110,7 @@ if (int(row["natural_encounter_count"]) != 1 or
         f"local_id={row['last_natural_local_id']} "
         f"state={row['diagnostic_state']} "
         f"start_failure={row['start_failure']} "
-        f"field_locks={row['replay_natural_lock_count']}"
+        f"field_locks={row.get('replay_natural_lock_observations', 'not-probed')}"
     )
 print("PASS: live mGBA facing-A activated existing native Rocket object event")
 CHECKNATIVE
