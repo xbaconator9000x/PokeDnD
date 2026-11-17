@@ -52,8 +52,10 @@ class ReplayWorkflowTests(unittest.TestCase):
         self.assertIn("outcome_acks", natural)
         self.assertIn("natural-resumed-", natural)
         self.assertNotIn("fixture-retry", natural)
-        self.assertIn('xdotool keydown --window "$WINDOW" "$direction"', natural)
-        self.assertIn('xdotool keyup --window "$WINDOW" "$direction"', natural)
+        self.assertIn('key "$direction"', natural)
+        self.assertIn('natural-resumed-${direction,,}', natural)
+        self.assertIn('xdotool keydown --window "$WINDOW" "$modifier"', natural)
+        self.assertIn('xdotool keyup --window "$WINDOW" "$modifier"', natural)
         self.assertIn("NATIVE_AUTHORED_REPLAY_ACCEPTED.txt", natural)
 
     def test_replay_runs_on_integration_changes(self):
@@ -112,8 +114,9 @@ class ReplayWorkflowTests(unittest.TestCase):
         self.assertIn("u8 scenario = D20_SCENARIO_STANDARD;", source)
         self.assertIn("if (StartCombat(scenario, i))", source)
         self.assertIn("#ifdef POKEDND_NATIVE_REPLAY_ROCKET", source)
-        self.assertIn("gMain.heldKeys & DPAD_UP", source)
-        self.assertIn("gMain.heldKeys & DPAD_DOWN", source)
+        self.assertIn("gMain.heldKeys & L_BUTTON", source)
+        self.assertIn("gMain.heldKeys & R_BUTTON", source)
+        self.assertNotIn("gMain.heldKeys & DPAD_UP", source.split("static bool8 TryRocketFieldEncounter", 1)[1].split("bool8 PokeDnD_HandleOverworldInput", 1)[0])
         self.assertIn("return FALSE;\n    }\n    return FALSE;\n}\nbool8 PokeDnD_HandleOverworldInput", source)
 
     def test_upstream_pin_matches_native_build(self):
