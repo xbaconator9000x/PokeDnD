@@ -5,6 +5,8 @@ on:
       - "integration/emerald/pokednd_overworld.c"
       - "integration/emerald/pokednd_overworld.h"
       - "integration/emerald/apply.py"
+      - "integration/emerald/audit_gba_memory.py"
+      - "tests/test_emerald_gba_memory.py"
       - "include/d20*"
       - "src/d20*"
       - ".github/workflows/emerald-integration.yml"
@@ -39,6 +41,8 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi \
             libpng-dev python3 build-essential
+      - name: Regression-test GBA memory audit
+        run: python3 -m unittest discover -s tests -p "test_emerald_gba_memory.py" -v
       - name: Fetch pinned upstream privately for build
         run: |
           git init upstream
@@ -63,6 +67,10 @@ jobs:
           test "$(stat -c %s "$ROM")" -le 33554432
           echo "Native integrated Emerald image: $(stat -c %s "$ROM") bytes"
           sha256sum "$ROM"
+      - name: Audit actual native ELF GBA memory allocations
+        run: |
+          mkdir -p evidence
+          python3 integration/emerald/audit_gba_memory.py upstream/pokeemerald.elf --output evidence/gba-memory-budget.json
       - name: Install native mGBA and display capture
         run: |
           sudo apt-get update -qq
