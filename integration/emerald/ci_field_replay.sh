@@ -111,7 +111,7 @@ CHECKNATIVECANCEL
 for direction in Right Left Up Down; do
   key "$direction"
   sleep 2
-  note="natural-resumed-$direction"
+  note="natural-resumed-${direction,,}"
   snap "26-$note"
   sample "$note"
   if python3 - "$OUT/runtime-probe.csv" <<'CHECKMOVE'
