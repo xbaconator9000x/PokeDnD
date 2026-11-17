@@ -83,12 +83,14 @@ if [ "${3:-debug}" = "natural" ]; then
   case "$scenario" in
     standard) key x ;;
     victory|defeat)
-      direction=Up
-      if [ "$scenario" = defeat ]; then direction=Down; fi
-      xdotool keydown --window "$WINDOW" "$direction"
+      # L/R do not turn or step the Emerald player before facing-A.
+      # Direction+A previously raced the native field movement callback.
+      modifier=a
+      if [ "$scenario" = defeat ]; then modifier=s; fi
+      xdotool keydown --window "$WINDOW" "$modifier"
       sleep 0.25
       key x
-      xdotool keyup --window "$WINDOW" "$direction"
+      xdotool keyup --window "$WINDOW" "$modifier"
       ;;
     *) echo "Invalid natural replay scenario: $scenario" >&2; exit 2 ;;
   esac
