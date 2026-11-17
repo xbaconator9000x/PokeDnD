@@ -269,7 +269,7 @@ with open(sys.argv[1], newline="") as handle:
     print(list(csv.DictReader(handle))[-1]["replay_fixture_status"])
 STATUS
 )
-  if [ "$status" != "1" ] && [ "$status" != "4" ]; then break; fi
+  if [ "$status" != "1" ] && [ "$status" != "3" ] && [ "$status" != "4" ]; then break; fi
   # Never send B as a generic field-recovery key: after Emerald has
   # resumed, it can interact with a menu rather than dismiss one. In the
   # previous native run, the third recovery entered a blank/reset-like
@@ -333,7 +333,7 @@ status = int(row["replay_fixture_status"])
 if status != 6:
     raise SystemExit(
         f"FAIL: Rocket fixture status {status} "
-        "(0=no chord, 1=locked, 2=facing, 3=blocked, 4=occupied, 5=allocation); "
+        "(0=no chord, 1=locked, 2=facing, 3=blocked, 4=occupied, 5=allocation/identity, 7=wrong placement); "
         f"native attempts={row['replay_fixture_attempt_count']}, "
         f"field lock observations={row['replay_fixture_lock_count']}. "
         "Do not bypass Emerald's field-control lock to manufacture a pass."
@@ -367,9 +367,22 @@ if int(row["natural_cleanup_status"]) != 1:
     raise SystemExit("FAIL: original Rocket NPC identity was not preserved on cleanup")
 print("PASS: native Rocket encounter cancelled without resetting attribution")
 CHECKNATIVECANCEL
-key Right
-sleep 2; snap 26-natural-field-restored
-sample natural-resumed
+# The restored Rocket may occupy the tile to the right. Try ordinary
+# directions and stop on the first observed real movement.
+for direction in Right Left Up Down; do
+  key "$direction"
+  sleep 2
+  note="natural-resumed-$direction"
+  snap "26-$note"
+  sample "$note"
+  if python3 - "$OUT/runtime-probe.csv" <<'CHECKMOVE'
+import csv, sys
+with open(sys.argv[1], newline="") as handle:
+    row = list(csv.DictReader(handle))[-1]
+raise SystemExit(0 if int(row["post_cancel_moves"]) >= 1 else 1)
+CHECKMOVE
+  then break; fi
+done
 python3 - "$OUT/runtime-probe.csv" <<'CHECKNATIVERESUME'
 import csv, sys
 with open(sys.argv[1], newline="") as handle:
