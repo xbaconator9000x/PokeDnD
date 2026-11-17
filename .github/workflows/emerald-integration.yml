@@ -17,6 +17,8 @@ on:
       - "integration/emerald/pokednd_overworld.c"
       - "integration/emerald/pokednd_overworld.h"
       - "integration/emerald/apply.py"
+      - "integration/emerald/audit_gba_memory.py"
+      - "tests/test_emerald_gba_memory.py"
       - "include/d20*"
       - "src/d20*"
       - ".github/workflows/emerald-integration.yml"
