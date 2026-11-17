@@ -228,6 +228,30 @@ sleep 2; snap 22-defeat-returned-field
 sample defeat-resumed
 python3 integration/emerald/validate_outcome_replay.py "$OUT/runtime-probe.csv" "$OUT"
 assert_no_natural_encounter
+# Native acceptance precondition: after the defeat replay, first prove that
+# ordinary Emerald D-pad movement is still functioning before trying to
+# create a fixture. A static screenshot is insufficient; the native
+# post-cancel movement counter must increase on an actual tile transition.
+# This prevents a lingering field script from being misdiagnosed as an
+# object allocation or Rocket interaction failure.
+sample pre-fixture-movement-baseline
+key Left
+sleep 2
+key Right
+sleep 2
+snap 22a-pre-fixture-field-movement
+sample pre-fixture-field-movement
+python3 - "$OUT/runtime-probe.csv" <<'CHECKFIELD'
+import csv, sys
+with open(sys.argv[1], newline="") as handle:
+    rows = list(csv.DictReader(handle))
+baseline, current = rows[-2:]
+if int(current["trigger_count"]) < 3:
+    raise SystemExit("FAIL: pre-fixture recovery lost native battle history")
+if int(current["diagnostic_state"]) not in (4, 5):
+    raise SystemExit("FAIL: pre-fixture field unexpectedly entered combat")
+print("PASS: retained battle history and idle D20 state before Rocket fixture")
+CHECKFIELD
 # Native source-only fixture: L+R+SELECT+START places an upstream Rocket
 # immediately in front of the player, using the same already exercised
 # L+R+START input path as debug encounters with SELECT as a fixture qualifier.
