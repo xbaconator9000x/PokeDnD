@@ -228,12 +228,10 @@ sleep 2; snap 22-defeat-returned-field
 sample defeat-resumed
 python3 integration/emerald/validate_outcome_replay.py "$OUT/runtime-probe.csv" "$OUT"
 assert_no_natural_encounter
-# Native acceptance precondition: after the defeat replay, first prove that
-# ordinary Emerald D-pad movement is still functioning before trying to
-# create a fixture. A static screenshot is insufficient; the native
-# post-cancel movement counter must increase on an actual tile transition.
-# This prevents a lingering field script from being misdiagnosed as an
-# object allocation or Rocket interaction failure.
+# After the defeat replay, exercise ordinary Emerald D-pad input before
+# creating a fixture, preserving a separate LCD/probe checkpoint. This is
+# a diagnostic precondition, NOT proof of a tile transition or unlocked
+# field controls; the fixture admission check remains authoritative.
 sample pre-fixture-movement-baseline
 key Left
 sleep 2
