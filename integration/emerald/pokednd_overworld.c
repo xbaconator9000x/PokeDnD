@@ -769,15 +769,14 @@ static bool8 TryRocketFieldEncounter(u16 newKeys)
         /* StartCombat may allocate sprites and freeze actors. Capture the
          * source NPC identity before those allocations can reuse slots. */
         const u8 localId = obj->localId;
-        /* Replay-only encounter difficulty selection exercises real native
-         * victory/defeat paths from the same authored NPC. The production
-         * encounter always uses standard stats. Holding a direction while
-         * pressing A is a CI fixture parameter, not a combat shortcut. */
+        /* Replay-only L+A / R+A select terminal test scenarios without
+         * sending directional movement to Emerald's field controller.
+         * The production encounter always uses standard statistics. */
         u8 scenario = D20_SCENARIO_STANDARD;
 #ifdef POKEDND_NATIVE_REPLAY_ROCKET
-        if (gMain.heldKeys & DPAD_UP)
+        if ((gMain.heldKeys & (L_BUTTON | R_BUTTON)) == L_BUTTON)
             scenario = D20_SCENARIO_VICTORY;
-        else if (gMain.heldKeys & DPAD_DOWN)
+        else if ((gMain.heldKeys & (L_BUTTON | R_BUTTON)) == R_BUTTON)
             scenario = D20_SCENARIO_DEFEAT;
 #endif
         if (StartCombat(scenario, i)) {
