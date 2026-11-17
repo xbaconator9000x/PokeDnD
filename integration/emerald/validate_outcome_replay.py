@@ -37,6 +37,17 @@ def validate(rows):
         if (tuple(standard) not in (standard_labels, legacy_labels) or
                 labels_all[:len(standard)] != standard):
             raise ValueError("standard native encounter checkpoints out of order")
+        # These are real debugger samples too. Validate their numeric payload
+        # before excluding them from victory/defeat-specific assertions.
+        for index, row in enumerate(rows[:len(standard)]):
+            for column in REQUIRED[1:]:
+                try:
+                    value = int(row[column], 0)
+                except (ValueError, TypeError) as error:
+                    raise ValueError("invalid standard native register " + column +
+                                     " at sample " + str(index)) from error
+                if value < 0 or value > 0xFFFFFFFF:
+                    raise ValueError("out-of-range standard native register " + column)
         rows = rows[len(standard):]
     parsed = []
     for row in rows:
