@@ -57,8 +57,8 @@ def validate(rows):
                 sample[column] = int(row[column], 0)
             except (ValueError, TypeError) as error:
                 raise ValueError("invalid native register " + column + " at " + row["label"]) from error
-            if sample[column] < 0:
-                raise ValueError("negative EWRAM value")
+            if sample[column] < 0 or sample[column] > 0xFFFFFFFF:
+                raise ValueError("out-of-range native EWRAM register " + column + " at " + row["label"])
         parsed.append(sample)
 
     def checkpoint(name):
