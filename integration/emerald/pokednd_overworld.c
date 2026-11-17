@@ -641,7 +641,9 @@ static void MoveSelected(u16 newKeys)
  * Only the original map actor is inspected; spawned debug actors are excluded.
  * A failed admission yields to the normal Emerald interaction. */
 #ifdef POKEDND_NATIVE_REPLAY_ROCKET
-/* CI-only: L+R+SELECT+START creates an object event before the normal\n * L+R+START debug handler can consume input.\n * Create a real native object event on the tile the player faces.
+/* CI-only: R+START creates a native fixture before the normal debug handler.
+ * L+R+SELECT+START is a GBA soft-reset chord and must never be sent by CI.
+ * Create the object on the tile the player faces.
  * The fixture uses upstream Emerald graphics and normal A interaction; it
  * is never compiled into the normal integration or committed as ROM data. */
 /* CI-only diagnostics: 0=not attempted, 1=controls locked, 2=invalid facing,
@@ -658,9 +660,8 @@ static bool8 SpawnReplayRocket(u16 newKeys, u16 heldKeys)
     struct MapPosition player;
     s16 x, y;
     u8 facing;
-    if (!(newKeys & START_BUTTON) ||
-        (heldKeys & (L_BUTTON | R_BUTTON | SELECT_BUTTON | START_BUTTON)) !=
-            (L_BUTTON | R_BUTTON | SELECT_BUTTON | START_BUTTON))
+    if (!(newKeys & START_BUTTON) || !(heldKeys & R_BUTTON) ||
+        (heldKeys & (L_BUTTON | SELECT_BUTTON)))
         return FALSE;
     gPokeDnDReplayFixtureAttemptCount++;
     if (ArePlayerFieldControlsLocked()) {
