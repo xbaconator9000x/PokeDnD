@@ -68,6 +68,14 @@ def validate(rows):
         if label not in allowed and not (label.startswith("victory-attack-")
                                          or label.startswith("defeat-turn-")):
             raise ValueError("unexpected native outcome checkpoint: " + label)
+    # Each input-driven turn/hit must have a unique, contiguous ordinal.
+    # Without this, a duplicated or forged intermediate debugger row can
+    # satisfy terminal assertions while hiding a missing real input step.
+    for prefix in ("victory-attack-", "defeat-turn-"):
+        observed = [label for label in labels if label.startswith(prefix)]
+        expected = [prefix + str(i) for i in range(1, len(observed) + 1)]
+        if observed != expected:
+            raise ValueError("noncontiguous or duplicate native input checkpoints: " + prefix)
     sequence = ["victory-start", "victory-result", "victory-confirmed",
                 "victory-resumed", "defeat-start", "defeat-result",
                 "defeat-confirmed", "defeat-resumed"]
