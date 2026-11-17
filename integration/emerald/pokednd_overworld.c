@@ -647,7 +647,7 @@ static void MoveSelected(u16 newKeys)
  * The fixture uses upstream Emerald graphics and normal A interaction; it
  * is never compiled into the normal integration or committed as ROM data. */
 /* CI-only diagnostics: 0=not attempted, 1=controls locked, 2=invalid facing,
- * 3=blocked tile, 4=occupied tile, 5=allocation failed, 6=spawned.
+ * 3=blocked tile, 4=occupied tile, 5=allocation/identity conflict, 6=verified spawn, 7=wrong placement.
  * Capture the genuine control lock both at fixture admission and at the
  * ordinary facing-A interaction. No bypass is allowed: a locked field
  * cannot be counted as a successful native encounter. */
@@ -694,10 +694,35 @@ static bool8 SpawnReplayRocket(u16 newKeys, u16 heldKeys)
             return TRUE;
         }
     }
-    gPokeDnDReplayFixtureStatus =
-        SpawnSpecialObjectEventParameterized(OBJ_EVENT_GFX_ROCKET_M,
-            MOVEMENT_TYPE_NONE, 230, x, y, player.elevation) == OBJECT_EVENTS_COUNT
-        ? 5 : 6;
+    /* Never allocate a second actor with the same map-local identity.
+     * A failed or repeated fixture request must not corrupt the object table. */
+    u8 fixtureId;
+    if (!TryGetObjectEventIdByLocalIdAndMap(230,
+            gSaveBlock1Ptr->location.mapNum,
+            gSaveBlock1Ptr->location.mapGroup, &fixtureId)) {
+        gPokeDnDReplayFixtureStatus = 5;
+        return TRUE;
+    }
+    fixtureId = SpawnSpecialObjectEventParameterized(OBJ_EVENT_GFX_ROCKET_M,
+            MOVEMENT_TYPE_NONE, 230, x, y, player.elevation);
+    if (fixtureId >= OBJECT_EVENTS_COUNT) {
+        gPokeDnDReplayFixtureStatus = 5;
+        return TRUE;
+    }
+    /* Allocation alone is not acceptance: verify the actual native actor
+     * occupies the facing tile and belongs to this map and elevation. */
+    const struct ObjectEvent *fixture = &gObjectEvents[fixtureId];
+    if (!fixture->active || fixture->localId != 230 ||
+        fixture->graphicsId != OBJ_EVENT_GFX_ROCKET_M ||
+        fixture->mapNum != gSaveBlock1Ptr->location.mapNum ||
+        fixture->mapGroup != gSaveBlock1Ptr->location.mapGroup ||
+        fixture->currentElevation != player.elevation ||
+        fixture->currentCoords.x != x || fixture->currentCoords.y != y) {
+        RemoveObjectEvent(&gObjectEvents[fixtureId]);
+        gPokeDnDReplayFixtureStatus = 7;
+        return TRUE;
+    }
+    gPokeDnDReplayFixtureStatus = 6;
     return TRUE;
 }
 #endif
