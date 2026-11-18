@@ -134,6 +134,25 @@ class GDBProbeTests(unittest.TestCase):
             a.close()
             fake.close()
 
+    def test_hardware_oam_counts_affine_and_regular_entries(self):
+        oam = bytearray(1024)
+        for i in range(0, 1024, 8):
+            oam[i:i+2] = (0x200).to_bytes(2, "little")
+        for i, attr in enumerate((0, 0x100, 0x300)):
+            oam[i*8:i*8+2] = attr.to_bytes(2, "little")
+        gdb = probe.RemoteGDB(mock.Mock())
+        with mock.patch.object(gdb, "read_bus", side_effect=lambda addr, size:
+                bytes(oam[addr-0x07000000:addr-0x07000000+size])
+                if addr >= 0x07000000 else b"\x01\x10") as bus:
+            self.assertEqual(gdb.resource_snapshot(), (3, 1, 1))
+            self.assertEqual(bus.call_count, 17)
+
+    def test_resource_read_rejects_short_packet(self):
+        gdb = probe.RemoteGDB(mock.Mock())
+        with mock.patch.object(gdb, "response", return_value="00"):
+            with self.assertRaisesRegex(ValueError, "invalid resource bus read"):
+                gdb.read_bus(0x07000000, 64)
+
     def test_gdb_rejects_malformed_memory_read(self):
         a, b = socket.socketpair()
         fake = FakeGDB(b, bytearray(0x40))
