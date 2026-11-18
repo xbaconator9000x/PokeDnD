@@ -33,6 +33,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_emerald_gdb_fragmented_checksum.py' -v
           python3 -m unittest discover -s tests -p 'test_emerald_runtime_probe_execution.py' -v
           python3 -m unittest discover -s tests -p 'test_emerald_outcome_replay.py' -v
+          python3 -m unittest discover -s tests -p 'test_emerald_runtime_resources.py' -v
       - name: Fetch exact pinned Emerald source
         run: |
           git init upstream
@@ -72,6 +73,11 @@ jobs:
           defeat_status=$?
           echo "Debug=$debug_status; authored retreat=$natural_status; authored victory=$victory_status; authored defeat=$defeat_status"
           test "$debug_status" = 0 && test "$natural_status" = 0 && test "$victory_status" = 0 && test "$defeat_status" = 0
+      - name: Validate live resource checkpoint evidence
+        run: |
+          for session in debug natural natural-victory natural-defeat; do
+            python3 integration/emerald/validate_runtime_resources.py "evidence/$session"
+          done
       - name: Retain emulator evidence
         if: always()
         uses: actions/upload-artifact@v4
