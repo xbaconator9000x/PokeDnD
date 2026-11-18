@@ -147,6 +147,27 @@ class GDBProbeTests(unittest.TestCase):
             self.assertEqual(gdb.resource_snapshot(), (3, 1, 1))
             self.assertEqual(bus.call_count, 17)
 
+    def test_live_stack_register_decode(self):
+        gdb = probe.RemoteGDB(mock.Mock())
+        registers = bytearray(68)
+        registers[52:56] = (0x03007e00).to_bytes(4, "little")
+        with mock.patch.object(gdb, "response", return_value=registers.hex()):
+            self.assertEqual(gdb.stack_snapshot(), (0x03007e00, 0x7e00))
+        gdb.sock.sendall.assert_called_once_with(packet("g"))
+
+    def test_stack_register_rejects_invalid_values(self):
+        gdb = probe.RemoteGDB(mock.Mock())
+        for value in ("E01", "00" * 16, "00" * 64):
+            with mock.patch.object(gdb, "response", return_value=value):
+                with self.assertRaises(ValueError):
+                    gdb.stack_snapshot()
+        for sp in (0x02000000, 0x03008004, 0x03007e01):
+            registers = bytearray(68)
+            registers[52:56] = sp.to_bytes(4, "little")
+            with mock.patch.object(gdb, "response", return_value=registers.hex()):
+                with self.assertRaisesRegex(ValueError, "stack pointer"):
+                    gdb.stack_snapshot()
+
     def test_resource_read_rejects_short_packet(self):
         gdb = probe.RemoteGDB(mock.Mock())
         with mock.patch.object(gdb, "response", return_value="00"):
