@@ -114,7 +114,23 @@ class RemoteGDB:
             raise ValueError("expected debugger stop reason, received " + state[:24])
         self.send("c")
 
-    def snapshot(self, addresses):
+    def read_bus(self, address, size):
+        self.send("m%x,%x" % (address, size))
+        value = self.response()
+        if len(value) != size * 2 or not re.fullmatch("[0-9a-fA-F]+", value):
+            raise ValueError("invalid resource bus read at %08x" % address)
+        return bytes.fromhex(value)
+
+    def resource_snapshot(self):
+        # Read hardware OAM, not the engine's shadow sprite array.
+        oam = b"".join(self.read_bus(0x07000000 + offset, 64)
+                       for offset in range(0, 1024, 64))
+        enabled = sum((int.from_bytes(oam[i:i+2], "little") & 0x300) != 0x200
+                      for i in range(0, 1024, 8))
+        display = int.from_bytes(self.read_bus(0x04000000, 2), "little")
+        return (enabled, display & 7, int(bool(display & 0x1000)))
+
+    def snapshot(self, addresses, resources=False):
         self.sock.sendall(b"\x03")
         reason = self.response()
         if not reason.startswith(("S", "T")):
@@ -127,6 +143,8 @@ class RemoteGDB:
                 if not re.fullmatch("[0-9a-fA-F]{8}", value):
                     raise ValueError("invalid four-byte EWRAM value for " + name + ": " + value[:24])
                 values[name] = int.from_bytes(bytes.fromhex(value), "little")
+            if resources:
+                values["resources"] = self.resource_snapshot()
         finally:
             self.send("c")
         return values
@@ -158,6 +176,7 @@ def serve(elf, out, port, nm):
         server.bind(str(socket_path))
         server.listen(2)
         csv_path.write_text(",".join(FIELDS) + "\n")
+        (out / "runtime-oam.csv").write_text("label,enabled_oam_entries,display_mode,obj_enabled\n")
         ready_path.write_text("mGBA GDB connected and native EWRAM symbols validated\n")
         try:
             while True:
@@ -171,7 +190,9 @@ def serve(elf, out, port, nm):
                         client.sendall(b"ERROR invalid sample label\n")
                         continue
                     try:
-                        values = gdb.snapshot(addresses)
+                        values = gdb.snapshot(addresses, resources=True)
+                        with (out / "runtime-oam.csv").open("a", newline="") as resource_file:
+                            csv.writer(resource_file).writerow([label, *values["resources"]])
                         row = [label] + [values[name] for name in NAMES]
                         with csv_path.open("a", newline="") as file:
                             csv.writer(file).writerow(row)
