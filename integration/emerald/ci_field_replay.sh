@@ -201,6 +201,56 @@ if int(row["post_cancel_moves"]) < 1:
     raise SystemExit("FAIL: native Rocket encounter did not restore field movement")
 print("PASS: native facing-A Rocket encounter restored real field movement")
 CHECKNATIVERESUME
+  # Independently reject blank or frozen native LCD evidence before admitting
+  # the authored encounter. Compare decoded pixels, not PNG metadata.
+  lcd_check() {
+    local frame="$1" colors
+    test -s "$frame" || return 1
+    colors=$(identify -format '%k' "$frame") || return 1
+    test "$colors" -ge 8
+  }
+  lcd_distinct() {
+    local left="$1" right="$2" a b
+    a=$(convert "$left" -alpha off -resize 240x160! -depth 8 rgb:- | sha256sum) || return 1
+    b=$(convert "$right" -alpha off -resize 240x160! -depth 8 rgb:- | sha256sum) || return 1
+    test "$a" != "$b"
+  }
+  # Exercise failure paths with synthetic images; never retain them as evidence.
+  lcd_fixture=$(mktemp -d)
+  convert -size 240x160 xc:white "$lcd_fixture/blank.png"
+  convert -size 240x160 gradient:black-white "$lcd_fixture/gradient.png"
+  if lcd_check "$lcd_fixture/blank.png" ||
+     lcd_distinct "$lcd_fixture/gradient.png" "$lcd_fixture/gradient.png" ||
+     ! lcd_check "$lcd_fixture/gradient.png" ||
+     ! lcd_distinct "$lcd_fixture/blank.png" "$lcd_fixture/gradient.png"; then
+    rm -rf "$lcd_fixture"
+    echo "FAIL: LCD gate regression self-test" >&2
+    exit 1
+  fi
+  rm -rf "$lcd_fixture"
+  entry="$OUT/24-facing-a-natural-encounter.png"
+  before="$OUT/05-authored-rocket-facing.png"
+  if [ "$scenario" = standard ]; then
+    terminal="$OUT/25-natural-cancelled.png"
+  else
+    terminal="$OUT/25-natural-$scenario-acknowledged.png"
+  fi
+  resumed="$OUT/26-$note.png"
+  for frame in "$before" "$entry" "$terminal" "$resumed"; do
+    lcd_check "$frame" || { echo "FAIL: missing or blank LCD $frame" >&2; exit 1; }
+  done
+  lcd_distinct "$before" "$entry" &&
+  lcd_distinct "$entry" "$terminal" &&
+  lcd_distinct "$terminal" "$resumed" || {
+    echo "FAIL: frozen LCD across native encounter transitions" >&2; exit 1;
+  }
+  {
+    printf 'capture,colors,sha256\\n'
+    for frame in "$before" "$entry" "$terminal" "$resumed"; do
+      printf '%s,%s,%s\\n' "$(basename "$frame")" "$(identify -format %k "$frame")" "$(sha256sum "$frame" | cut -d' ' -f1)"
+    done
+  } > "$OUT/lcd-transition-manifest.csv"
+  printf '%s\\n' "PASS: nonblank distinct native LCD entry, cleanup and movement; semantic visual review remains separate" > "$OUT/lcd-transition-verdict.txt"
   sha256sum "$ROM" | awk '{print $1}' > "$OUT/rom-sha256.txt"
   printf '%s\n' "PASS: authored Oldale NPC, ordinary A, ${scenario} resolution and field movement" > "$OUT/NATIVE_AUTHORED_REPLAY_ACCEPTED.txt"
   exit 0
