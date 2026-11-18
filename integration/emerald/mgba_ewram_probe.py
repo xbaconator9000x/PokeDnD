@@ -121,6 +121,18 @@ class RemoteGDB:
             raise ValueError("invalid resource bus read at %08x" % address)
         return bytes.fromhex(value)
 
+    def stack_snapshot(self):
+        # ARM GDB register packet begins with r0-r15, each little-endian u32.
+        # This is instantaneous SP, not a stack high-water measurement.
+        self.send("g")
+        value = self.response()
+        if len(value) < 128 or not re.fullmatch("[0-9a-fA-F]+", value) or len(value) % 2:
+            raise ValueError("invalid ARM register packet")
+        sp = int.from_bytes(bytes.fromhex(value[104:112]), "little")
+        if not 0x03000000 <= sp <= 0x03008000 or sp % 4:
+            raise ValueError("unaligned or out-of-IWRAM stack pointer: %08x" % sp)
+        return sp, sp - 0x03000000
+
     def resource_snapshot(self):
         # Read hardware OAM, not the engine's shadow sprite array.
         oam = b"".join(self.read_bus(0x07000000 + offset, 64)
@@ -145,6 +157,7 @@ class RemoteGDB:
                 values[name] = int.from_bytes(bytes.fromhex(value), "little")
             if resources:
                 values["resources"] = self.resource_snapshot()
+                values["stack"] = self.stack_snapshot()
         finally:
             self.send("c")
         return values
@@ -177,6 +190,7 @@ def serve(elf, out, port, nm):
         server.listen(2)
         csv_path.write_text(",".join(FIELDS) + "\n")
         (out / "runtime-oam.csv").write_text("label,enabled_oam_entries,display_mode,obj_enabled\n")
+        (out / "runtime-stack.csv").write_text("label,sp,bytes_above_iwram_base\n")
         ready_path.write_text("mGBA GDB connected and native EWRAM symbols validated\n")
         try:
             while True:
@@ -193,6 +207,8 @@ def serve(elf, out, port, nm):
                         values = gdb.snapshot(addresses, resources=True)
                         with (out / "runtime-oam.csv").open("a", newline="") as resource_file:
                             csv.writer(resource_file).writerow([label, *values["resources"]])
+                        with (out / "runtime-stack.csv").open("a", newline="") as stack_file:
+                            csv.writer(stack_file).writerow([label, *values["stack"]])
                         row = [label] + [values[name] for name in NAMES]
                         with csv_path.open("a", newline="") as file:
                             csv.writer(file).writerow(row)
