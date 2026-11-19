@@ -46,17 +46,21 @@ FIELDS = ("label", "trigger_count", "start_failure", "milestones",
           "replay_fixture_attempt_count")
 
 
-def symbol_addresses(elf: Path, nm: str = "arm-none-eabi-nm"):
+HEAP_NAMES = ("gPokeDnDHeapCurrent", "gPokeDnDHeapPeak",
+              "gPokeDnDHeapFailures", "gPokeDnDHeapCapacity", "gPokeDnDHeapEpoch")
+
+
+def symbol_addresses(elf: Path, nm: str = "arm-none-eabi-nm", names=NAMES):
     output = subprocess.check_output([nm, "-n", str(elf)], text=True)
     addresses = {}
     for line in output.splitlines():
         parts = line.split()
-        if len(parts) == 3 and parts[2] in NAMES:
+        if len(parts) == 3 and parts[2] in names:
             address = int(parts[0], 16)
             if not 0x02000000 <= address <= 0x0203FFFC or address % 4:
                 raise ValueError("probe symbol is not aligned GBA EWRAM: " + parts[2])
             addresses[parts[2]] = address
-    missing = set(NAMES) - set(addresses)
+    missing = set(names) - set(addresses)
     if missing:
         raise ValueError("missing linked EWRAM probe symbols: " + ", ".join(sorted(missing)))
     return addresses
@@ -149,7 +153,7 @@ class RemoteGDB:
             raise ValueError("mGBA did not stop for EWRAM snapshot: " + reason[:24])
         values = {}
         try:
-            for name in NAMES:
+            for name in addresses:
                 self.send("m%x,4" % addresses[name])
                 value = self.response()
                 if not re.fullmatch("[0-9a-fA-F]{8}", value):
@@ -177,7 +181,7 @@ def connect_gdb(port, timeout=25):
 
 def serve(elf, out, port, nm):
     out.mkdir(parents=True, exist_ok=True)
-    addresses = symbol_addresses(elf, nm)
+    addresses = symbol_addresses(elf, nm, NAMES + HEAP_NAMES)
     socket_path = out / "ewram-probe.sock"
     csv_path = out / "runtime-probe.csv"
     ready_path = out / "ewram-probe-ready.txt"
@@ -191,6 +195,7 @@ def serve(elf, out, port, nm):
         csv_path.write_text(",".join(FIELDS) + "\n")
         (out / "runtime-oam.csv").write_text("label,enabled_oam_entries,display_mode,obj_enabled\n")
         (out / "runtime-stack.csv").write_text("label,sp,bytes_above_iwram_base\n")
+        (out / "runtime-heap.csv").write_text("label,current,peak,failures,capacity,epoch\n")
         ready_path.write_text("mGBA GDB connected and native EWRAM symbols validated\n")
         try:
             while True:
@@ -209,6 +214,8 @@ def serve(elf, out, port, nm):
                             csv.writer(resource_file).writerow([label, *values["resources"]])
                         with (out / "runtime-stack.csv").open("a", newline="") as stack_file:
                             csv.writer(stack_file).writerow([label, *values["stack"]])
+                        with (out / "runtime-heap.csv").open("a", newline="") as heap_file:
+                            csv.writer(heap_file).writerow([label, *[values[name] for name in HEAP_NAMES]])
                         row = [label] + [values[name] for name in NAMES]
                         with csv_path.open("a", newline="") as file:
                             csv.writer(file).writerow(row)
