@@ -127,3 +127,14 @@ class ResourceTests(unittest.TestCase):
                    "".join(f"{label},{0x03007E40},{0x03007FA0},0,352\n" for label in ("a", "b")))
         with self.assertRaises(ValueError):
             resources.validate(self.root, require_irq=True)
+
+    def test_heap_reserve_boundary(self):
+        for peak in (744, 745):
+            self.write("runtime-heap.csv",
+                       "label,current,peak,failures,capacity,epoch\n"
+                       f"a,100,{peak},0,1000,1\nb,100,{peak},0,1000,1\n")
+            if peak == 744:
+                self.assertEqual(resources.validate(self.root, require_heap=True)["heap_remaining_at_peak"], 256)
+            else:
+                with self.assertRaisesRegex(ValueError, "heap reserve"):
+                    resources.validate(self.root, require_heap=True)
