@@ -50,3 +50,21 @@ class ResourceTests(unittest.TestCase):
         self.write("runtime-oam.csv", "label,enabled_oam_entries,display_mode,obj_enabled\na,129,0,1\nb,40,0,1\n")
         with self.assertRaises(ValueError):
             resources.validate(self.root)
+
+    def test_heap_peak_survives_free(self):
+        self.write("runtime-heap.csv", "label,current,peak,failures,capacity,epoch\na,200,300,0,1000,1\nb,100,400,0,1000,1\n")
+        report = resources.validate(self.root, require_heap=True)
+        self.assertEqual(report["heap_peak_bytes"], 400)
+        self.assertEqual(report["heap_remaining_at_peak"], 600)
+
+    def test_heap_invalid(self):
+        for row in ("b,100,200,0,1000,1", "b,400,300,0,1000,1",
+                    "b,100,300,1,1000,1", "b,100,300,0,1000,2",
+                    "b,100,1001,0,1000,1"):
+            self.write("runtime-heap.csv", "label,current,peak,failures,capacity,epoch\na,200,300,0,1000,1\n" + row + "\n")
+            with self.subTest(row=row), self.assertRaises(ValueError):
+                resources.validate(self.root, require_heap=True)
+
+    def test_heap_required(self):
+        with self.assertRaises(FileNotFoundError):
+            resources.validate(self.root, require_heap=True)
