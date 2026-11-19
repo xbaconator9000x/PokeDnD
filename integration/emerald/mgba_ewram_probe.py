@@ -66,6 +66,30 @@ def symbol_addresses(elf: Path, nm: str = "arm-none-eabi-nm", names=NAMES):
     return addresses
 
 
+def stack_bounds(elf, nm):
+    names = ("__pokednd_stack_low", "__pokednd_stack_top")
+    found = {}
+    for line in subprocess.check_output([nm, "-n", str(elf)], text=True).splitlines():
+        parts = line.split()
+        if len(parts) == 3 and parts[2] in names:
+            found[parts[2]] = int(parts[0], 16)
+    low, top = (found.get(name, 0) for name in names)
+    if not (0x03000000 <= low <= top - 1024
+            and top == 0x03007E40 and low % 4 == 0):
+        raise ValueError("invalid linked system stack bounds")
+    return low, top
+
+
+def watermark_usage(data):
+    if not data or len(data) % 4:
+        raise ValueError("invalid stack watermark length")
+    marker = bytes.fromhex("c33c5aa5")
+    untouched = 0
+    while untouched < len(data) and data[untouched:untouched+4] == marker:
+        untouched += 4
+    return len(data) - untouched, untouched
+
+
 class RemoteGDB:
     def __init__(self, sock):
         self.sock = sock
@@ -146,7 +170,7 @@ class RemoteGDB:
         display = int.from_bytes(self.read_bus(0x04000000, 2), "little")
         return (enabled, display & 7, int(bool(display & 0x1000)))
 
-    def snapshot(self, addresses, resources=False):
+    def snapshot(self, addresses, resources=False, bounds=None):
         self.sock.sendall(b"\x03")
         reason = self.response()
         if not reason.startswith(("S", "T")):
@@ -162,6 +186,11 @@ class RemoteGDB:
             if resources:
                 values["resources"] = self.resource_snapshot()
                 values["stack"] = self.stack_snapshot()
+                if bounds is not None:
+                    low, top = bounds
+                    data = b"".join(self.read_bus(addr, min(256, top-addr))
+                                    for addr in range(low, top, 256))
+                    values["watermark"] = (low, top, *watermark_usage(data))
         finally:
             self.send("c")
         return values
@@ -182,6 +211,7 @@ def connect_gdb(port, timeout=25):
 def serve(elf, out, port, nm):
     out.mkdir(parents=True, exist_ok=True)
     addresses = symbol_addresses(elf, nm, NAMES + HEAP_NAMES)
+    bounds = stack_bounds(elf, nm)
     socket_path = out / "ewram-probe.sock"
     csv_path = out / "runtime-probe.csv"
     ready_path = out / "ewram-probe-ready.txt"
@@ -196,6 +226,7 @@ def serve(elf, out, port, nm):
         (out / "runtime-oam.csv").write_text("label,enabled_oam_entries,display_mode,obj_enabled\n")
         (out / "runtime-stack.csv").write_text("label,sp,bytes_above_iwram_base\n")
         (out / "runtime-heap.csv").write_text("label,current,peak,failures,capacity,epoch\n")
+        (out / "runtime-watermark.csv").write_text("label,low,top,used,untouched\\n".replace("\\n", "\n"))
         ready_path.write_text("mGBA GDB connected and native EWRAM symbols validated\n")
         try:
             while True:
@@ -209,13 +240,15 @@ def serve(elf, out, port, nm):
                         client.sendall(b"ERROR invalid sample label\n")
                         continue
                     try:
-                        values = gdb.snapshot(addresses, resources=True)
+                        values = gdb.snapshot(addresses, resources=True, bounds=bounds)
                         with (out / "runtime-oam.csv").open("a", newline="") as resource_file:
                             csv.writer(resource_file).writerow([label, *values["resources"]])
                         with (out / "runtime-stack.csv").open("a", newline="") as stack_file:
                             csv.writer(stack_file).writerow([label, *values["stack"]])
                         with (out / "runtime-heap.csv").open("a", newline="") as heap_file:
                             csv.writer(heap_file).writerow([label, *[values[name] for name in HEAP_NAMES]])
+                        with (out / "runtime-watermark.csv").open("a", newline="") as watermark_file:
+                            csv.writer(watermark_file).writerow([label, *values["watermark"]])
                         row = [label] + [values[name] for name in NAMES]
                         with csv_path.open("a", newline="") as file:
                             csv.writer(file).writerow(row)
