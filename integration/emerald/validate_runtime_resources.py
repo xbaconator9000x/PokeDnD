@@ -29,6 +29,8 @@ def validate_heap(directory, labels):
                          or peak < previous[1]):
             raise ValueError("heap reset or peak regression during replay")
         previous = current, peak, failures, capacity, epoch
+    if previous[3] - previous[1] < 256:
+        raise ValueError("heap reserve below 256 bytes")
     if previous[1] == 0:
         raise ValueError("no observed native heap allocations")
     return {"heap_peak_bytes": previous[1], "heap_capacity_bytes": previous[3],
