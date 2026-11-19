@@ -39,6 +39,8 @@ class EmeraldFieldBootTests(TestCase):
             "warp_events": [], "coord_events": [], "bg_events": []}))
         (path / "src/overworld.c").write_text(OVERWORLD)
         (path / "src/malloc.c").write_text(FIXTURE)
+        (path / "src/crt0.s").write_text("\tbl InitializeWorkingMemory\nsp_sys: .word IWRAM_END - 0x1c0\n")
+        (path / "ld_script_modern.ld").write_text("    /* BEGIN ROM DATA */")
         (path / "src/new_game.c").write_text(
             "static void WarpToTruck(void)\n"
             "{\n"
@@ -55,6 +57,16 @@ class EmeraldFieldBootTests(TestCase):
         with mock.patch.object(apply.subprocess, "check_output",
                                return_value=apply.PIN + "\n"):
             apply.install(path, **kwargs)
+
+    def test_stack_bounds_and_boot_order(self):
+        startup = "\tbl InitializeWorkingMemory\nsp_sys: .word IWRAM_END - 0x1c0\n"
+        patched, linker = apply.instrument_stack(startup, "    /* BEGIN ROM DATA */")
+        self.assertIn("strlo r2, [r0], #4", patched)
+        self.assertLess(patched.index("bl InitializeWorkingMemory"), patched.index("strlo"))
+        self.assertIn("SIZEOF(.iwram.bss)", linker)
+        self.assertIn(">= 1024", linker)
+        with self.assertRaises(RuntimeError):
+            apply.instrument_stack(startup.replace("0x1c0", "0x200"), "    /* BEGIN ROM DATA */")
 
     def test_normal_build_preserves_vanilla_truck(self):
         with tempfile.TemporaryDirectory() as tmp:
