@@ -21,7 +21,8 @@ def instrument_stack(startup, linker):
     boundary = "    /* BEGIN ROM DATA */"
     if startup.count(anchor) != 1 or linker.count(boundary) != 1:
         raise RuntimeError("Pinned stack startup/linker anchor mismatch")
-    if "sp_sys: .word IWRAM_END - 0x1c0" not in startup:
+    if ("sp_sys: .word IWRAM_END - 0x1c0" not in startup
+            or "sp_irq: .word IWRAM_END - 0x60" not in startup):
         raise RuntimeError("Pinned system stack top changed")
     startup = startup.replace(anchor, anchor + """
 \tldr r0, =__pokednd_stack_low
@@ -31,10 +32,19 @@ def instrument_stack(startup, linker):
 \tcmp r0, r1
 \tstrlo r2, [r0], #4
 \tblo 1b
+\tldr r0, =__pokednd_irq_low
+\tldr r1, =__pokednd_irq_top
+2:
+\tcmp r0, r1
+\tstrlo r2, [r0], #4
+\tblo 2b
 """.replace("\\t", "\t"), 1)
     linker = linker.replace(boundary, """
     __pokednd_stack_low = ALIGN(ADDR(.iwram.bss) + SIZEOF(.iwram.bss), 4);
     __pokednd_stack_top = ORIGIN(IWRAM) + LENGTH(IWRAM) - 0x1c0;
+    __pokednd_irq_low = __pokednd_stack_top;
+    __pokednd_irq_top = ORIGIN(IWRAM) + LENGTH(IWRAM) - 0x60;
+    ASSERT(__pokednd_irq_top - __pokednd_irq_low == 352, "IRQ stack layout changed")
     ASSERT(__pokednd_stack_top - __pokednd_stack_low >= 1024, "Insufficient system stack")
 """ + boundary, 1)
     return startup, linker
