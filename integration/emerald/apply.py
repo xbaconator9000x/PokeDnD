@@ -14,6 +14,32 @@ PIN = "4da9230cf7c1f1d7b0d47b45783b202666fffece"
 SOURCE = Path(__file__).resolve().parents[2]
 
 
+
+def instrument_stack(startup, linker):
+    """Paint only unused system stack at boot, before any IRQ or C call."""
+    anchor = "\tbl InitializeWorkingMemory\n"
+    boundary = "    /* BEGIN ROM DATA */"
+    if startup.count(anchor) != 1 or linker.count(boundary) != 1:
+        raise RuntimeError("Pinned stack startup/linker anchor mismatch")
+    if "sp_sys: .word IWRAM_END - 0x1c0" not in startup:
+        raise RuntimeError("Pinned system stack top changed")
+    startup = startup.replace(anchor, anchor + """
+\tldr r0, =__pokednd_stack_low
+\tldr r1, =__pokednd_stack_top
+\tldr r2, =0xA55A3CC3
+1:
+\tcmp r0, r1
+\tstrlo r2, [r0], #4
+\tblo 1b
+""".replace("\\t", "\t"), 1)
+    linker = linker.replace(boundary, """
+    __pokednd_stack_low = ALIGN(ADDR(.iwram.bss) + SIZEOF(.iwram.bss), 4);
+    __pokednd_stack_top = ORIGIN(IWRAM) + LENGTH(IWRAM) - 0x1c0;
+    ASSERT(__pokednd_stack_top - __pokednd_stack_low >= 1024, "Insufficient system stack")
+""" + boundary, 1)
+    return startup, linker
+
+
 def instrument_heap(source):
     """Count actual occupied bytes, including allocated block headers."""
     edits = [
@@ -137,10 +163,15 @@ def install(upstream: Path, *, check_only: bool = False, field_replay: bool = Fa
     if field_replay:
         heap_target = upstream / "src/malloc.c"
         heap_modified = instrument_heap(heap_target.read_text(encoding="utf-8"))
+        stack_target = upstream / "src/crt0.s"
+        linker_target = upstream / "ld_script_modern.ld"
+        stack_modified, linker_modified = instrument_stack(stack_target.read_text(), linker_target.read_text())
     if check_only:
         print("PASS: upstream SHA, hook anchors and replay warp verified")
         return
     if field_replay:
+        stack_target.write_text(stack_modified)
+        linker_target.write_text(linker_modified)
         heap_target.write_text(heap_modified, encoding="utf-8")
         replay_target.write_text(replay_modified, encoding="utf-8")
         replay_map.write_text(map_modified, encoding="utf-8")
