@@ -14,7 +14,28 @@ def rows(path):
     return result
 
 
-def validate(directory):
+def validate_heap(directory, labels):
+    heap = rows(directory / "runtime-heap.csv")
+    if [row["label"] for row in heap] != labels:
+        raise ValueError("heap checkpoint sequence differs from gameplay trace")
+    previous = None
+    for row in heap:
+        current, peak, failures, capacity, epoch = (
+            int(row[k]) for k in ("current", "peak", "failures", "capacity", "epoch"))
+        if not (0 <= current <= peak <= capacity <= 0x40000
+                and capacity > 0 and epoch > 0 and failures == 0):
+            raise ValueError("invalid heap accounting or allocation failure")
+        if previous and (epoch != previous[4] or capacity != previous[3]
+                         or peak < previous[1]):
+            raise ValueError("heap reset or peak regression during replay")
+        previous = current, peak, failures, capacity, epoch
+    if previous[1] == 0:
+        raise ValueError("no observed native heap allocations")
+    return {"heap_peak_bytes": previous[1], "heap_capacity_bytes": previous[3],
+            "heap_remaining_at_peak": previous[3] - previous[1]}
+
+
+def validate(directory, require_heap=False):
     state = rows(directory / "runtime-probe.csv")
     oam = rows(directory / "runtime-oam.csv")
     stack = rows(directory / "runtime-stack.csv")
@@ -34,14 +55,17 @@ def validate(directory):
             raise ValueError("invalid IWRAM stack checkpoint")
         occupancy.append(count)
         pointers.append(sp)
-    return {"checkpoints": len(labels), "max_sampled_oam_entries": max(occupancy),
+    report = {"checkpoints": len(labels), "max_sampled_oam_entries": max(occupancy),
             "min_sampled_sp": min(pointers), "max_sampled_sp": max(pointers),
-            "limitations": "Checkpoint observations only; not heap or stack high-water."}
+            "limitations": "OAM and stack are checkpoint samples; stack high-water remains unmeasured."}
+    if require_heap:
+        report.update(validate_heap(directory, labels))
+    return report
 
 
 if __name__ == "__main__":
     directory = Path(sys.argv[1])
-    report = validate(directory)
+    report = validate(directory, require_heap=True)
     (directory / "runtime-resource-verdict.json").write_text(
         json.dumps(report, indent=2) + "\n")
     print("PASS: resource checkpoint integrity")
