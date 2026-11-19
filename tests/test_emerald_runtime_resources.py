@@ -88,3 +88,42 @@ class ResourceTests(unittest.TestCase):
     def test_watermark_required(self):
         with self.assertRaises(FileNotFoundError):
             resources.validate(self.root, require_watermark=True)
+
+    def irq_trace(self, second):
+        self.write("runtime-irq.csv",
+                   "label,low,top,used,untouched\n"
+                   f"a,{0x03007E40},{0x03007FA0},192,160\n" + second + "\n")
+
+    def test_irq_peak_retained(self):
+        self.irq_trace(f"b,{0x03007E40},{0x03007FA0},128,224")
+        report = resources.validate(self.root, require_irq=True)
+        self.assertEqual(report["irq_stack_peak_written_bytes"], 192)
+        self.assertEqual(report["irq_stack_min_untouched_bytes"], 160)
+
+    def test_irq_budget_boundary(self):
+        self.irq_trace(f"b,{0x03007E40},{0x03007FA0},320,32")
+        self.assertEqual(resources.validate(self.root, require_irq=True)["irq_stack_min_untouched_bytes"], 32)
+
+    def test_irq_invalid(self):
+        for label, low, top, used, untouched in (
+            ("b", 0x03007E40, 0x03007FA0, 324, 28),
+            ("b", 0x03007E44, 0x03007FA0, 192, 160),
+            ("b", 0x03007E40, 0x03007FA4, 192, 160),
+            ("b", 0x03007E40, 0x03007FA0, 193, 159),
+            ("b", 0x03007E40, 0x03007FA0, 192, 156),
+            ("c", 0x03007E40, 0x03007FA0, 192, 160),
+        ):
+            self.irq_trace(f"{label},{low},{top},{used},{untouched}")
+            with self.subTest(label=label, low=low, top=top, used=used, untouched=untouched):
+                with self.assertRaises(ValueError):
+                    resources.validate(self.root, require_irq=True)
+
+    def test_irq_required(self):
+        with self.assertRaises(FileNotFoundError):
+            resources.validate(self.root, require_irq=True)
+
+    def test_irq_no_writes_rejected(self):
+        self.write("runtime-irq.csv", "label,low,top,used,untouched\n" +
+                   "".join(f"{label},{0x03007E40},{0x03007FA0},0,352\n" for label in ("a", "b")))
+        with self.assertRaises(ValueError):
+            resources.validate(self.root, require_irq=True)
