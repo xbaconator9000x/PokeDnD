@@ -68,3 +68,23 @@ class ResourceTests(unittest.TestCase):
     def test_heap_required(self):
         with self.assertRaises(FileNotFoundError):
             resources.validate(self.root, require_heap=True)
+
+    def test_watermark_peak_retained(self):
+        self.write("runtime-watermark.csv", "label,low,top,used,untouched\na,50362432,50363968,512,1024\nb,50362432,50363968,256,1280\n")
+        report = resources.validate(self.root, require_watermark=True)
+        self.assertEqual(report["system_stack_peak_written_bytes"], 512)
+        self.assertEqual(report["system_stack_min_untouched_bytes"], 1024)
+
+    def test_watermark_invalid(self):
+        for row in ("b,50362432,50363968,1408,128",
+                    "b,50362436,50363968,512,1020",
+                    "b,50362432,50363968,513,1023",
+                    "b,50362432,50363968,512,1000",
+                    "c,50362432,50363968,512,1024"):
+            self.write("runtime-watermark.csv", "label,low,top,used,untouched\na,50362432,50363968,512,1024\n" + row + "\n")
+            with self.subTest(row=row), self.assertRaises(ValueError):
+                resources.validate(self.root, require_watermark=True)
+
+    def test_watermark_required(self):
+        with self.assertRaises(FileNotFoundError):
+            resources.validate(self.root, require_watermark=True)
