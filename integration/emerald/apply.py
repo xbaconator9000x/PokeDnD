@@ -13,6 +13,44 @@ import json
 PIN = "4da9230cf7c1f1d7b0d47b45783b202666fffece"
 SOURCE = Path(__file__).resolve().parents[2]
 
+
+def instrument_heap(source):
+    """Count actual occupied bytes, including allocated block headers."""
+    edits = [
+        ("static u32 sHeapSize;", """static u32 sHeapSize;
+EWRAM_DATA volatile u32 gPokeDnDHeapCurrent = 0;
+EWRAM_DATA volatile u32 gPokeDnDHeapPeak = 0;
+EWRAM_DATA volatile u32 gPokeDnDHeapFailures = 0;
+EWRAM_DATA volatile u32 gPokeDnDHeapCapacity = 0;
+EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
+        ("return pos->data;", """gPokeDnDHeapCurrent += pos->size + sizeof(struct MemBlock);
+                if (gPokeDnDHeapCurrent > gPokeDnDHeapPeak)
+                    gPokeDnDHeapPeak = gPokeDnDHeapCurrent;
+                return pos->data;"""),
+        ("if (pos->next == head)\n            return NULL;", """if (pos->next == head)
+        {
+            if (gPokeDnDHeapFailures != 0xFFFFFFFFu)
+                gPokeDnDHeapFailures++;
+            return NULL;
+        }"""),
+        ("block->allocated = FALSE;\n\n        // If", """gPokeDnDHeapCurrent -= block->size + sizeof(struct MemBlock);
+        block->allocated = FALSE;
+
+        // If"""),
+        ("sHeapSize = heapSize;", """sHeapSize = heapSize;
+    gPokeDnDHeapCurrent = 0;
+    gPokeDnDHeapPeak = 0;
+    gPokeDnDHeapFailures = 0;
+    gPokeDnDHeapCapacity = heapSize;
+    gPokeDnDHeapEpoch++;"""),
+    ]
+    for old, new in edits:
+        if source.count(old) != 1:
+            raise RuntimeError("Pinned allocator anchor mismatch: " + old)
+        source = source.replace(old, new, 1)
+    return source
+
+
 def authored_replay_map(original: str) -> str:
     """Append one map-authored opponent; never change existing map IDs/events."""
     data = json.loads(original)
@@ -96,10 +134,14 @@ def install(upstream: Path, *, check_only: bool = False, field_replay: bool = Fa
     replay_map = upstream / "data/maps/OldaleTown/map.json"
     if field_replay:
         map_modified = authored_replay_map(replay_map.read_text(encoding="utf-8"))
+    if field_replay:
+        heap_target = upstream / "src/malloc.c"
+        heap_modified = instrument_heap(heap_target.read_text(encoding="utf-8"))
     if check_only:
         print("PASS: upstream SHA, hook anchors and replay warp verified")
         return
     if field_replay:
+        heap_target.write_text(heap_modified, encoding="utf-8")
         replay_target.write_text(replay_modified, encoding="utf-8")
         replay_map.write_text(map_modified, encoding="utf-8")
     target.write_text(content.replace(include_anchor, include_replacement, 1)
