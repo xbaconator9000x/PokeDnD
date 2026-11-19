@@ -2,6 +2,7 @@
 
 These fixtures contain original test text only; no Pokémon ROM or game assets.
 """
+from test_emerald_heap import FIXTURE
 import json
 import importlib.util
 from pathlib import Path
@@ -37,6 +38,7 @@ class EmeraldFieldBootTests(TestCase):
             "id": "MAP_OLDALE_TOWN", "object_events": [{"x": i, "y": 1} for i in range(4)],
             "warp_events": [], "coord_events": [], "bg_events": []}))
         (path / "src/overworld.c").write_text(OVERWORLD)
+        (path / "src/malloc.c").write_text(FIXTURE)
         (path / "src/new_game.c").write_text(
             "static void WarpToTruck(void)\n"
             "{\n"
@@ -75,6 +77,7 @@ class EmeraldFieldBootTests(TestCase):
             self.assertIn("MAP_NUM(MAP_OLDALE_TOWN)", modified)
             self.assertIn("WARP_ID_NONE, 10, 12", modified)
             self.assertNotIn(TRUCK, modified)
+            self.assertIn("gPokeDnDHeapPeak", (root / "src/malloc.c").read_text())
             self.assertIn("PokeDnD_HandleOverworldInput",
                           (root / "src/overworld.c").read_text())
 
@@ -145,6 +148,7 @@ class EmeraldFieldBootTests(TestCase):
             self.make_upstream(root)
             self.install(root, field_replay=True, check_only=True)
             self.assertIn(TRUCK, (root / "src/new_game.c").read_text())
+            self.assertEqual((root / "src/malloc.c").read_text(), FIXTURE)
             self.assertEqual((root / "src/overworld.c").read_text(), OVERWORLD)
 
 
