@@ -61,7 +61,27 @@ def validate_watermark(directory, labels):
             "system_stack_min_untouched_bytes": bounds[1] - bounds[0] - peak}
 
 
-def validate(directory, require_heap=False, require_watermark=False):
+def validate_irq(directory, labels):
+    trace = rows(directory / "runtime-irq.csv")
+    if [row["label"] for row in trace] != labels:
+        raise ValueError("IRQ checkpoint sequence mismatch")
+    peak = 0
+    for row in trace:
+        low, top, used, untouched = (int(row[k]) for k in ("low", "top", "used", "untouched"))
+        if not ((low, top) == (0x03007E40, 0x03007FA0)
+                and used >= 0 and untouched >= 32
+                and used % 4 == 0 and untouched % 4 == 0
+                and used + untouched == 352):
+            raise ValueError("IRQ stack watermark exceeds safe budget")
+        peak = max(peak, used)
+    if peak == 0:
+        raise ValueError("no native IRQ stack writes observed")
+    return {"irq_stack_peak_written_bytes": peak,
+            "irq_stack_capacity_bytes": 352,
+            "irq_stack_min_untouched_bytes": 352 - peak}
+
+
+def validate(directory, require_heap=False, require_watermark=False, require_irq=False):
     state = rows(directory / "runtime-probe.csv")
     oam = rows(directory / "runtime-oam.csv")
     stack = rows(directory / "runtime-stack.csv")
@@ -89,12 +109,15 @@ def validate(directory, require_heap=False, require_watermark=False):
     if require_watermark:
         report.update(validate_watermark(directory, labels))
         report['limitations'] = 'System stack watermark measures overwritten words, not unwritten reservations; IRQ stack and OAM remain checkpoint observations.'
+    if require_irq:
+        report.update(validate_irq(directory, labels))
+        report["limitations"] = "Stack watermarks measure overwritten words, not unwritten reservations; OAM is sampled."
     return report
 
 
 if __name__ == "__main__":
     directory = Path(sys.argv[1])
-    report = validate(directory, require_heap=True, require_watermark=True)
+    report = validate(directory, require_heap=True, require_watermark=True, require_irq=True)
     (directory / "runtime-resource-verdict.json").write_text(
         json.dumps(report, indent=2) + "\n")
     print("PASS: resource checkpoint integrity")
