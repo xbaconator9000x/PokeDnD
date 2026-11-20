@@ -88,7 +88,7 @@ Evidence: https://github.com/xbaconator9000x/PokeDnD/actions/runs/43707170926
 
 Later exact-head native replay acceptance at commit `1accaf7eebb7b56d5587ff6c4a43d3e0147b03c5` passed all four workflows, including input-driven debug, natural Rocket retreat, victory and defeat. The native outcome validator requires separate attack/turn checkpoints, HP-based terminal damage, result acknowledgement, sprite hit-reaction counters, cleanup and one subsequent overworld movement step. Evidence: https://github.com/xbaconator9000x/PokeDnD/actions/runs/44098534974
 
-**Acceptance boundary:** GitHub reports native input/EWRAM validation success, but the uploaded LCD frames have not yet been independently inspected. The replay-only Oldale warp and victory/defeat modifiers are test fixtures, not default production gameplay. Resource-budget measurements and SRD versus homebrew rules provenance remain to be documented before roadmap issue #3 can be checked off. A passing validator or compilation is not a substitute for reviewing native LCD images.
+**Acceptance boundary:** GitHub reports native input/EWRAM validation success, but the uploaded LCD frames have not yet been independently inspected. The replay-only Oldale warp and victory/defeat modifiers are test fixtures, not default production gameplay. Runtime heap and stack budgets now have automated evidence; independent LCD review and remaining resource measurements are still outstanding. A passing validator or compilation is not a substitute for reviewing native LCD images.
 
 No private ROM bytes, Shattered assets, saves, keys or copyrighted sprite
 assets are committed here. Build artifacts are held privately for seven days.
@@ -103,10 +103,23 @@ and the sizes of named PokéDND RAM objects including `sBattle`. The audit fails
 closed if core combat or diagnostic symbols are absent. The JSON is source-derived
 build metadata, not proprietary ROM content.
 
-**Not yet measured:** peak stack/heap concurrency, dynamic sprite/OAM allocation,
-VRAM runtime ownership, VBlank timing, and gameplay performance. Linked ELF
-allocation alone cannot establish those runtime budgets; native mGBA acceptance
-and actual LCD review remain independent gates.
+## Runtime resource acceptance
+
+The replay workflow requires matching checkpoint labels for gameplay, heap, OAM,
+stack pointer and both stack watermarks in all four scenarios. At exact commit
+`816c5fd71fb54cff3438d86194cba40a2a34022d`, the [native replay](https://github.com/xbaconator9000x/PokeDnD/actions/runs/44613633091) and portable core passed; the separate hardware demo and source integration jobs were cancelled.
+
+| Resource | Enforced replay gate |
+| --- | --- |
+| Heap | Zero allocation failures; stable capacity and reset epoch; monotonic peak; at least 256 bytes remaining at peak |
+| System stack | Linker-derived lower bound, top 0x03007E40; at least 256 untouched bytes; minimum capacity 1024 bytes |
+| IRQ stack | 0x03007E40–0x03007FA0 (352 bytes); at least 32 untouched bytes |
+| OAM | Sampled enabled entries within 128 hardware entries |
+
+Watermarks measure overwritten words, not unwritten stack reservations. Heap
+and stack peaks may occur at different times. OAM samples do not establish
+peak dynamic sprite allocation. Runtime VRAM ownership, VBlank timing and
+independent LCD review remain outstanding. The linked ELF audit is a separate gate.
 
 **Rules provenance:** trainer-group initiative, paid Pokémon commands, automatic
 Dodge, species statistics and current encounter balance are experimental
@@ -114,3 +127,18 @@ PokéDND prototype rules, **not** asserted to be D&D 2024 SRD 5.2.1 or
 source-verified Pokémon 5e (2024) mechanics. The C99 core must remain usable
 without Pokémon content; future optional-module rules require independent
 source/licence verification before being labelled canonical.
+
+### Rule-by-rule prototype provenance
+
+Reference: [SRD 5.2.1](https://www.dndbeyond.com/srd), CC BY 4.0. The following is a source-code classification, not certification of full SRD fidelity.
+
+| Implementation | Classification and limits |
+| --- | --- |
+| `d20_mod`, `d20_start`, `d20_attack` | SRD-derived ability modifiers, Dexterity initiative, attack vs AC, natural 1/20 and doubled critical damage dice. Dexterity tie-break is a prototype policy. |
+| `d20_dash`, `d20_walk` | SRD-derived movement and Dash; orthogonal five-foot grid, BFS and blocked tiles are implementation choices, not complete movement rules. |
+| `d20_command`, `d20_deploy`, `d20_next` | Homebrew trainer-linked initiative, paid commands, deployment delay and automatic Dodge; not verified Pokémon 5e rules. |
+| `d20_attack` / Dodge | Partial disadvantage mechanic; does not implement the full SRD Dodge action or its saving-throw benefits and exceptions. |
+| Tackle, Quick Attack, Thunderbolt, Sleep Powder | Prototype move definitions and balance. Sleep Powder's CON save and one missed turn are homebrew, not the SRD Sleep spell. |
+| `resolve_victory`, party limits | Prototype encounter termination and roster policy, not universal D&D rules. |
+
+No Pokémon 5e 2024 rule is promoted to canonical status by this table. No third-party rules text or compendium is reproduced.
