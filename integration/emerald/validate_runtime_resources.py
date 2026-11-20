@@ -83,7 +83,36 @@ def validate_irq(directory, labels):
             "irq_stack_min_untouched_bytes": 352 - peak}
 
 
-def validate(directory, require_heap=False, require_watermark=False, require_irq=False):
+def validate_video(directory, labels, oam):
+    trace = rows(directory / "runtime-video.csv")
+    if [row["label"] for row in trace] != labels:
+        raise ValueError("video checkpoint sequence mismatch")
+    layouts = []
+    for row, sprite in zip(trace, oam):
+        control, status, line, *backgrounds = (int(row[k]) for k in
+            ("dispcnt", "dispstat", "vcount", "bg0cnt", "bg1cnt", "bg2cnt", "bg3cnt"))
+        if not all(0 <= value <= 65535 for value in (control, status, *backgrounds)):
+            raise ValueError("invalid video register width")
+        if not 0 <= line < 228:
+            raise ValueError("invalid GBA scanline")
+        if control & 7 != int(sprite["display_mode"]) or bool(control & 0x1000) != bool(int(sprite["obj_enabled"])):
+            raise ValueError("inconsistent display control snapshots")
+        # Text BG screen blocks occupy 2 KiB apiece. Character blocks
+        # identify bases only; these are not allocator occupancy measurements.
+        if control & 7 == 0:
+            for index, bg in enumerate(backgrounds):
+                if control & (0x100 << index):
+                    base = (bg >> 8) & 31
+                    blocks = (1, 2, 2, 4)[bg >> 14]
+                    if base + blocks > 32:
+                        raise ValueError("text BG screen map exceeds BG VRAM")
+                    layouts.append({"bg": index, "screen_base": base,
+                                    "screen_blocks": blocks, "char_base": (bg >> 2) & 3})
+    return {"video_checkpoints": len(trace), "text_bg_layouts": layouts,
+            "video_limitations": "Register snapshots only; not VRAM ownership or VBlank duration."}
+
+
+def validate(directory, require_heap=False, require_watermark=False, require_irq=False, require_video=False):
     state = rows(directory / "runtime-probe.csv")
     oam = rows(directory / "runtime-oam.csv")
     stack = rows(directory / "runtime-stack.csv")
@@ -114,12 +143,14 @@ def validate(directory, require_heap=False, require_watermark=False, require_irq
     if require_irq:
         report.update(validate_irq(directory, labels))
         report["limitations"] = "Stack watermarks measure overwritten words, not unwritten reservations; OAM is sampled."
+    if require_video:
+        report.update(validate_video(directory, labels, oam))
     return report
 
 
 if __name__ == "__main__":
     directory = Path(sys.argv[1])
-    report = validate(directory, require_heap=True, require_watermark=True, require_irq=True)
+    report = validate(directory, require_heap=True, require_watermark=True, require_irq=True, require_video=True)
     (directory / "runtime-resource-verdict.json").write_text(
         json.dumps(report, indent=2) + "\n")
     print("PASS: resource checkpoint integrity")
