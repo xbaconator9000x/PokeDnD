@@ -146,6 +146,11 @@ class ResourceTests(unittest.TestCase):
         self.assertEqual(report["video_checkpoints"], 2)
         self.assertEqual(report["text_bg_layouts"][0]["screen_base"], 28)
 
+    def test_video_shared_screen_blocks(self):
+        self.write("runtime-video.csv", "label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt\na,4864,0,12,7168,7168,0,0\nb,4864,1,170,7168,7424,0,0\n")
+        report = resources.validate(self.root, require_video=True)
+        self.assertEqual(report["peak_sampled_text_screen_bytes"], 4096)
+
     def test_video_invalid(self):
         for value in ("b,4352,0,228,7168,0,0,0", "b,0,0,10,0,0,0,0",
                       "b,4352,0,10,65280,0,0,0"):
