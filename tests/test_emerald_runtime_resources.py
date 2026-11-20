@@ -140,6 +140,24 @@ class ResourceTests(unittest.TestCase):
                     resources.validate(self.root, require_heap=True)
 
 
+    def test_video_checkpoints(self):
+        self.write("runtime-video.csv", "label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt\na,4352,0,12,7168,0,0,0\nb,4352,1,170,7168,0,0,0\n")
+        report = resources.validate(self.root, require_video=True)
+        self.assertEqual(report["video_checkpoints"], 2)
+        self.assertEqual(report["text_bg_layouts"][0]["screen_base"], 28)
+
+    def test_video_invalid(self):
+        for value in ("b,4352,0,228,7168,0,0,0", "b,0,0,10,0,0,0,0",
+                      "b,4352,0,10,65280,0,0,0"):
+            self.write("runtime-video.csv", "label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt\na,4352,0,12,7168,0,0,0\n" + value + "\n")
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                resources.validate(self.root, require_video=True)
+
+    def test_video_missing(self):
+        with self.assertRaises(FileNotFoundError):
+            resources.validate(self.root, require_video=True)
+
+
 class HudAllocationTests(unittest.TestCase):
     def test_native_window_guard(self):
         import subprocess
@@ -209,19 +227,3 @@ int main(void) {
                             str(src), "-o", str(exe)], check=True)
             subprocess.run([str(exe)], check=True)
 
-    def test_video_checkpoints(self):
-        self.write("runtime-video.csv", "label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt\na,4352,0,12,7168,0,0,0\nb,4352,1,170,7168,0,0,0\n")
-        report = resources.validate(self.root, require_video=True)
-        self.assertEqual(report["video_checkpoints"], 2)
-        self.assertEqual(report["text_bg_layouts"][0]["screen_base"], 28)
-
-    def test_video_invalid(self):
-        for value in ("b,4352,0,228,7168,0,0,0", "b,0,0,10,0,0,0,0",
-                      "b,4352,0,10,65280,0,0,0"):
-            self.write("runtime-video.csv", "label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt\na,4352,0,12,7168,0,0,0\n" + value + "\n")
-            with self.subTest(value=value), self.assertRaises(ValueError):
-                resources.validate(self.root, require_video=True)
-
-    def test_video_missing(self):
-        with self.assertRaises(FileNotFoundError):
-            resources.validate(self.root, require_video=True)
