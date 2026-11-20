@@ -168,10 +168,17 @@ void PokeDnD_HudAttack(const u8 *move, D20Attack attack)
  * when automatic allocation is enabled. Do not draw over another BG0 window. */
 static bool8 HudWindowOwnsTiles(u32 id)
 {
-    const struct WindowTemplate *hud = &gWindows[id].window;
-    u32 end = hud->baseBlock + hud->width * hud->height;
-    u32 i;
-    if (hud->bg != 0 || gWindows[id].tileData == NULL || end > 1024)
+    const struct WindowTemplate *hud;
+    u32 end, i;
+    if (id >= WINDOWS_MAX)
+        return FALSE;
+    hud = &gWindows[id].window;
+    end = hud->baseBlock + hud->width * hud->height;
+    /* Field BG0 uses a 32x32 text tilemap. Reject invalid geometry. */
+    if (hud->bg != 0 || gWindows[id].tileData == NULL || end > 1024
+        || hud->width == 0 || hud->height == 0
+        || hud->tilemapLeft + hud->width > 32
+        || hud->tilemapTop + hud->height > 32)
         return FALSE;
     for (i = 0; i < WINDOWS_MAX; i++)
     {
