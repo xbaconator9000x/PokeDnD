@@ -138,3 +138,58 @@ class ResourceTests(unittest.TestCase):
             else:
                 with self.assertRaisesRegex(ValueError, "heap reserve"):
                     resources.validate(self.root, require_heap=True)
+
+
+class HudAllocationTests(unittest.TestCase):
+    def test_native_window_guard(self):
+        import subprocess
+        source = (Path(__file__).resolve().parents[1] /
+                  "integration/emerald/pokednd_hud.c").read_text()
+        guard = source.split("static bool8 HudWindowOwnsTiles", 1)[1].split(
+            "bool8 PokeDnD_HudOpen", 1)[0]
+        harness = r"""
+#include <stddef.h>
+#include <assert.h>
+typedef unsigned int u32;
+typedef unsigned char bool8;
+#define FALSE 0
+#define TRUE 1
+#define WINDOWS_MAX 32
+struct WindowTemplate {
+    unsigned bg, tilemapLeft, tilemapTop, width, height, baseBlock;
+};
+struct Window { struct WindowTemplate window; void *tileData; };
+static struct Window gWindows[WINDOWS_MAX];
+static bool8 HudWindowOwnsTiles
+""" + guard + r"""
+int main(void) {
+    unsigned i;
+    for (i=0; i<WINDOWS_MAX; ++i) gWindows[i].window.bg=255;
+    gWindows[0].window=(struct WindowTemplate){0,1,0,28,6,64};
+    gWindows[0].tileData=&gWindows[0];
+    gWindows[1].window=(struct WindowTemplate){0,2,15,27,4,404};
+    assert(HudWindowOwnsTiles(0));
+    gWindows[1].window.baseBlock=231;
+    assert(!HudWindowOwnsTiles(0));
+    gWindows[1].window.baseBlock=232;
+    assert(HudWindowOwnsTiles(0));
+    gWindows[1].window.tilemapTop=5;
+    assert(!HudWindowOwnsTiles(0));
+    gWindows[1].window.bg=1;
+    assert(HudWindowOwnsTiles(0));
+    gWindows[0].window.baseBlock=857;
+    assert(!HudWindowOwnsTiles(0));
+    gWindows[0].window.baseBlock=856;
+    assert(HudWindowOwnsTiles(0));
+    gWindows[0].tileData=NULL;
+    assert(!HudWindowOwnsTiles(0));
+    return 0;
+}
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            src = Path(directory) / "guard.c"
+            exe = Path(directory) / "guard"
+            src.write_text(harness)
+            subprocess.run(["cc", "-std=c99", "-Wall", "-Wextra", "-Werror",
+                            str(src), "-o", str(exe)], check=True)
+            subprocess.run([str(exe)], check=True)
