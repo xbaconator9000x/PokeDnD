@@ -70,7 +70,7 @@ class ResourceTests(unittest.TestCase):
             resources.validate(self.root, require_heap=True)
 
     def test_watermark_peak_retained(self):
-        self.write("runtime-watermark.csv", "label,low,top,used,untouched\na,50362432,50363968,512,1024\nb,50362432,50363968,256,1280\n")
+        self.write("runtime-watermark.csv", "label,low,top,used,untouched\na,50362432,50363968,256,1280\nb,50362432,50363968,512,1024\n")
         report = resources.validate(self.root, require_watermark=True)
         self.assertEqual(report["system_stack_peak_written_bytes"], 512)
         self.assertEqual(report["system_stack_min_untouched_bytes"], 1024)
@@ -95,10 +95,21 @@ class ResourceTests(unittest.TestCase):
                    f"a,{0x03007E40},{0x03007FA0},192,160\n" + second + "\n")
 
     def test_irq_peak_retained(self):
-        self.irq_trace(f"b,{0x03007E40},{0x03007FA0},128,224")
+        self.irq_trace(f"b,{0x03007E40},{0x03007FA0},224,128")
         report = resources.validate(self.root, require_irq=True)
-        self.assertEqual(report["irq_stack_peak_written_bytes"], 192)
-        self.assertEqual(report["irq_stack_min_untouched_bytes"], 160)
+        self.assertEqual(report["irq_stack_peak_written_bytes"], 224)
+        self.assertEqual(report["irq_stack_min_untouched_bytes"], 128)
+
+    def test_system_stack_watermark_regression_rejected(self):
+        self.write("runtime-watermark.csv",
+                   "label,low,top,used,untouched\na,50362432,50363968,512,1024\nb,50362432,50363968,256,1280\n")
+        with self.assertRaisesRegex(ValueError, "regressed"):
+            resources.validate(self.root, require_watermark=True)
+
+    def test_irq_watermark_regression_rejected(self):
+        self.irq_trace(f"b,{0x03007E40},{0x03007FA0},128,224")
+        with self.assertRaisesRegex(ValueError, "regressed"):
+            resources.validate(self.root, require_irq=True)
 
     def test_irq_budget_boundary(self):
         self.irq_trace(f"b,{0x03007E40},{0x03007FA0},320,32")
