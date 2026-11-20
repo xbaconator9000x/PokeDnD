@@ -173,6 +173,12 @@ class RemoteGDB:
             raise ValueError("unaligned or out-of-IWRAM stack pointer: %08x" % sp)
         return sp, sp - 0x03000000
 
+    def video_snapshot(self):
+        # Read actual GBA display registers while the CPU is stopped.
+        regs = self.read_bus(0x04000000, 16)
+        words = [int.from_bytes(regs[i:i+2], "little") for i in range(0, 16, 2)]
+        return (words[0], words[2], words[3], *words[4:8])
+
     def resource_snapshot(self):
         # Read hardware OAM, not the engine's shadow sprite array.
         oam = b"".join(self.read_bus(0x07000000 + offset, 64)
@@ -197,6 +203,7 @@ class RemoteGDB:
                 values[name] = int.from_bytes(bytes.fromhex(value), "little")
             if resources:
                 values["resources"] = self.resource_snapshot()
+                values["video"] = self.video_snapshot()
                 values["stack"] = self.stack_snapshot()
                 if bounds is not None:
                     low, top = bounds
@@ -246,6 +253,7 @@ def serve(elf, out, port, nm):
         (out / "runtime-heap.csv").write_text("label,current,peak,failures,capacity,epoch\n")
         (out / "runtime-watermark.csv").write_text("label,low,top,used,untouched\\n".replace("\\n", "\n"))
         (out / "runtime-irq.csv").write_text("label,low,top,used,untouched\n")
+        (out / "runtime-video.csv").write_text("label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt\n")
         ready_path.write_text("mGBA GDB connected and native EWRAM symbols validated\n")
         try:
             while True:
@@ -270,6 +278,8 @@ def serve(elf, out, port, nm):
                             csv.writer(watermark_file).writerow([label, *values["watermark"]])
                         with (out / "runtime-irq.csv").open("a", newline="") as irq_file:
                             csv.writer(irq_file).writerow([label, *values["irq"]])
+                        with (out / "runtime-video.csv").open("a", newline="") as video_file:
+                            csv.writer(video_file).writerow([label, *values["video"]])
                         row = [label] + [values[name] for name in NAMES]
                         with csv_path.open("a", newline="") as file:
                             csv.writer(file).writerow(row)
