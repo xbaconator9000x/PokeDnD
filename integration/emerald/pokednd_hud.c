@@ -164,6 +164,33 @@ void PokeDnD_HudAttack(const u8 *move, D20Attack attack)
     }
 }
 
+/* Inspect the actual allocation: upstream AddWindow can replace baseBlock
+ * when automatic allocation is enabled. Do not draw over another BG0 window. */
+static bool8 HudWindowOwnsTiles(u32 id)
+{
+    const struct WindowTemplate *hud = &gWindows[id].window;
+    u32 end = hud->baseBlock + hud->width * hud->height;
+    u32 i;
+    if (hud->bg != 0 || gWindows[id].tileData == NULL || end > 1024)
+        return FALSE;
+    for (i = 0; i < WINDOWS_MAX; i++)
+    {
+        const struct WindowTemplate *other = &gWindows[i].window;
+        u32 otherEnd;
+        if (i == id || other->bg != hud->bg)
+            continue;
+        otherEnd = other->baseBlock + other->width * other->height;
+        if (hud->baseBlock < otherEnd && other->baseBlock < end)
+            return FALSE;
+        if (hud->tilemapLeft < other->tilemapLeft + other->width
+            && other->tilemapLeft < hud->tilemapLeft + hud->width
+            && hud->tilemapTop < other->tilemapTop + other->height
+            && other->tilemapTop < hud->tilemapTop + hud->height)
+            return FALSE;
+    }
+    return TRUE;
+}
+
 bool8 PokeDnD_HudOpen(const D20Battle *battle, int human, int pokemon, int enemy)
 {
     u32 id;
@@ -173,6 +200,11 @@ bool8 PokeDnD_HudOpen(const D20Battle *battle, int human, int pokemon, int enemy
     id = AddWindow(&sHudWindow);
     if (id == WINDOW_NONE)
         return FALSE;
+    if (!HudWindowOwnsTiles(id))
+    {
+        RemoveWindow(id);
+        return FALSE;
+    }
     sHudWindowId = id;
     sHumanId = human;
     sPokemonId = pokemon;
