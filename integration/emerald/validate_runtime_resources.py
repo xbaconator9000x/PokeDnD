@@ -8,6 +8,16 @@ from pathlib import Path
 def rows(path):
     with path.open(newline="") as handle:
         result = list(csv.DictReader(handle))
+    # DictReader silently overwrites duplicate header names and places surplus
+    # fields under the None key. Neither is valid native replay evidence.
+    with path.open(newline="") as handle:
+        headers = csv.reader(handle).__next__()
+    if (not headers or headers[0] != "label" or len(headers) != len(set(headers))
+            or any(not name for name in headers)):
+        raise ValueError(f"{path.name}: malformed or duplicate CSV headers")
+    if any(None in row or any(value is None or value == "" for value in row.values())
+           for row in result):
+        raise ValueError(f"{path.name}: incomplete or surplus checkpoint fields")
     labels = [row["label"] for row in result]
     if not labels or len(set(labels)) != len(labels):
         raise ValueError(f"{path.name}: empty or duplicate checkpoints")
