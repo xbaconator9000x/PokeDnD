@@ -88,6 +88,7 @@ def validate_video(directory, labels, oam):
     if [row["label"] for row in trace] != labels:
         raise ValueError("video checkpoint sequence mismatch")
     layouts = []
+    peak_screen_bytes = 0
     for row, sprite in zip(trace, oam):
         control, status, line, *backgrounds = (int(row[k]) for k in
             ("dispcnt", "dispstat", "vcount", "bg0cnt", "bg1cnt", "bg2cnt", "bg3cnt"))
@@ -100,15 +101,18 @@ def validate_video(directory, labels, oam):
         # Text BG screen blocks occupy 2 KiB apiece. Character blocks
         # identify bases only; these are not allocator occupancy measurements.
         if control & 7 == 0:
+            occupied = set()
             for index, bg in enumerate(backgrounds):
                 if control & (0x100 << index):
                     base = (bg >> 8) & 31
                     blocks = (1, 2, 2, 4)[bg >> 14]
                     if base + blocks > 32:
                         raise ValueError("text BG screen map exceeds BG VRAM")
+                    occupied.update(range(base, base + blocks))
                     layouts.append({"bg": index, "screen_base": base,
                                     "screen_blocks": blocks, "char_base": (bg >> 2) & 3})
-    return {"video_checkpoints": len(trace), "text_bg_layouts": layouts,
+            peak_screen_bytes = max(peak_screen_bytes, len(occupied) * 2048)
+    return {"peak_sampled_text_screen_bytes": peak_screen_bytes, "video_checkpoints": len(trace), "text_bg_layouts": layouts,
             "video_limitations": "Register snapshots only; not VRAM ownership or VBlank duration."}
 
 
