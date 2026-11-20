@@ -5,13 +5,14 @@ on:
   pull_request:
     paths:
       - "gba/**"
-      - "src/d20.c"
-      - "include/d20.h"
+      - "src/**"
+      - "include/**"
+      - "Makefile"
       - ".github/workflows/gba-demo.yml"
   workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   build-gba:
     runs-on: ubuntu-latest
@@ -25,10 +26,16 @@ jobs:
           test -s gba/build/pokednd-poc.gba
           test "$(stat -c %s gba/build/pokednd-poc.gba)" -lt 33554432
           ls -lh gba/build/pokednd-poc.gba
+          cd gba/build
+          sha256sum pokednd-poc.gba > SHA256SUMS
+          printf "%s\n" "$GITHUB_SHA" > BUILD_COMMIT
       - uses: actions/upload-artifact@v4
         with:
           name: pokednd-poc-gba-unsigned-homebrew
-          path: gba/build/pokednd-poc.gba
+          path: |
+            gba/build/pokednd-poc.gba
+            gba/build/SHA256SUMS
+            gba/build/BUILD_COMMIT
           if-no-files-found: error
 
   emulator-boot:
@@ -40,6 +47,11 @@ jobs:
         with:
           name: pokednd-poc-gba-unsigned-homebrew
           path: rom
+      - name: Verify exact build artifact before replay
+        run: |
+          cd rom
+          sha256sum -c SHA256SUMS
+          test "$(cat BUILD_COMMIT)" = "$GITHUB_SHA"
       - name: Install native mGBA and capture utilities
         run: |
           sudo apt-get update -qq
