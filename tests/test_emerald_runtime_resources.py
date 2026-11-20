@@ -178,6 +178,21 @@ class ResourceTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 resources.validate(self.root, require_video=True)
 
+    def test_video_unsupported_bg_modes_fail_closed(self):
+        # Mode 1/2 affine and mode 3 bitmap BG layouts are not text maps.
+        # They must not silently produce a zero-byte VRAM verdict.
+        for mode, enabled in ((1, 0x0400), (2, 0x0400), (3, 0x0400)):
+            control = mode | enabled | 0x1000
+            self.write("runtime-video.csv",
+                       "label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt\\n"
+                       f"a,{control},0,12,0,0,0,0\\n"
+                       f"b,{control},0,24,0,0,0,0\\n")
+            self.write("runtime-oam.csv",
+                       "label,enabled_oam_entries,display_mode,obj_enabled\\n"
+                       f"a,12,{mode},1\\nb,40,{mode},1\\n")
+            with self.subTest(mode=mode), self.assertRaisesRegex(ValueError, "unsupported enabled BG"):
+                resources.validate(self.root, require_video=True)
+
     def test_video_missing(self):
         with self.assertRaises(FileNotFoundError):
             resources.validate(self.root, require_video=True)
