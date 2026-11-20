@@ -43,6 +43,7 @@ def validate_watermark(directory, labels):
         raise ValueError("stack watermark checkpoint sequence mismatch")
     bounds = None
     peak = 0
+    previous_used = None
     for row in trace:
         low, top, used, untouched = (int(row[k]) for k in
                                      ("low", "top", "used", "untouched"))
@@ -54,6 +55,9 @@ def validate_watermark(directory, labels):
             raise ValueError("system stack watermark exceeds safe budget")
         if bounds is not None and bounds != (low, top):
             raise ValueError("system stack bounds changed")
+        if previous_used is not None and used < previous_used:
+            raise ValueError("system stack watermark regressed between checkpoints")
+        previous_used = used
         bounds = low, top
         peak = max(peak, used)
     if peak == 0:
@@ -68,6 +72,7 @@ def validate_irq(directory, labels):
     if [row["label"] for row in trace] != labels:
         raise ValueError("IRQ checkpoint sequence mismatch")
     peak = 0
+    previous_used = None
     for row in trace:
         low, top, used, untouched = (int(row[k]) for k in ("low", "top", "used", "untouched"))
         if not ((low, top) == (0x03007E40, 0x03007FA0)
@@ -75,6 +80,9 @@ def validate_irq(directory, labels):
                 and used % 4 == 0 and untouched % 4 == 0
                 and used + untouched == 352):
             raise ValueError("IRQ stack watermark exceeds safe budget")
+        if previous_used is not None and used < previous_used:
+            raise ValueError("IRQ stack watermark regressed between checkpoints")
+        previous_used = used
         peak = max(peak, used)
     if peak == 0:
         raise ValueError("no native IRQ stack writes observed")
