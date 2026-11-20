@@ -33,22 +33,22 @@ class ResourceTests(unittest.TestCase):
 
     def test_duplicate_csv_header_rejected(self):
         self.write("runtime-oam.csv",
-                   "label,enabled_oam_entries,display_mode,obj_enabled,obj_enabled\\n"
-                   "a,12,0,1,1\\nb,40,0,1,1\\n")
+                   "label,enabled_oam_entries,display_mode,obj_enabled,obj_enabled\n"
+                   "a,12,0,1,1\nb,40,0,1,1\n")
         with self.assertRaisesRegex(ValueError, "duplicate CSV headers"):
             resources.validate(self.root)
 
     def test_surplus_csv_fields_rejected(self):
         self.write("runtime-stack.csv",
-                   "label,sp,bytes_above_iwram_base\\n"
-                   "a,50364412,32764,unexpected\\nb,50364408,32760\\n")
+                   "label,sp,bytes_above_iwram_base\n"
+                   "a,50364412,32764,unexpected\nb,50364408,32760\n")
         with self.assertRaisesRegex(ValueError, "surplus checkpoint"):
             resources.validate(self.root)
 
     def test_missing_csv_field_rejected(self):
         self.write("runtime-oam.csv",
-                   "label,enabled_oam_entries,display_mode,obj_enabled\\n"
-                   "a,12,0,1\\nb,40,0\\n")
+                   "label,enabled_oam_entries,display_mode,obj_enabled\n"
+                   "a,12,0,1\nb,40,0\n")
         with self.assertRaisesRegex(ValueError, "incomplete"):
             resources.validate(self.root)
 
