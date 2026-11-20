@@ -89,6 +89,8 @@ def validate_video(directory, labels, oam):
         raise ValueError("video checkpoint sequence mismatch")
     layouts = []
     peak_screen_bytes = 0
+    peak_char_bytes = 0
+    peak_union_bytes = 0
     for row, sprite in zip(trace, oam):
         control, status, line, *backgrounds = (int(row[k]) for k in
             ("dispcnt", "dispstat", "vcount", "bg0cnt", "bg1cnt", "bg2cnt", "bg3cnt"))
@@ -102,6 +104,7 @@ def validate_video(directory, labels, oam):
         # identify bases only; these are not allocator occupancy measurements.
         if control & 7 == 0:
             occupied = set()
+            character = set()
             for index, bg in enumerate(backgrounds):
                 if control & (0x100 << index):
                     base = (bg >> 8) & 31
@@ -109,11 +112,17 @@ def validate_video(directory, labels, oam):
                     if base + blocks > 32:
                         raise ValueError("text BG screen map exceeds BG VRAM")
                     occupied.update(range(base, base + blocks))
+                    char_base = ((bg >> 2) & 3) * 8
+                    character.update(range(char_base, char_base + 8))
                     layouts.append({"bg": index, "screen_base": base,
                                     "screen_blocks": blocks, "char_base": (bg >> 2) & 3})
             peak_screen_bytes = max(peak_screen_bytes, len(occupied) * 2048)
-    return {"peak_sampled_text_screen_bytes": peak_screen_bytes, "video_checkpoints": len(trace), "text_bg_layouts": layouts,
-            "video_limitations": "Register snapshots only; not VRAM ownership or VBlank duration."}
+            peak_char_bytes = max(peak_char_bytes, len(character) * 2048)
+            peak_union_bytes = max(peak_union_bytes, len(character | occupied) * 2048)
+    return {"peak_sampled_text_char_base_span_bytes": peak_char_bytes,
+            "peak_sampled_text_base_union_bytes": peak_union_bytes,
+            "peak_sampled_text_screen_bytes": peak_screen_bytes, "video_checkpoints": len(trace), "text_bg_layouts": layouts,
+            "video_limitations": "Register snapshots only; character spans represent nominal 16 KiB base blocks, not actual tile usage or allocator ownership; no VBlank duration."}
 
 
 def validate(directory, require_heap=False, require_watermark=False, require_irq=False, require_video=False):
