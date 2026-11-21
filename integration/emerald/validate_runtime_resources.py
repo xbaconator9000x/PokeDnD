@@ -122,6 +122,9 @@ def validate_irq(directory, labels):
 
 def validate_video(directory, labels, oam):
     trace = rows(directory / "runtime-video.csv")
+    require_counter_columns(trace, ("label", "dispcnt", "dispstat", "vcount",
+                                   "bg0cnt", "bg1cnt", "bg2cnt", "bg3cnt"),
+                            "runtime-video.csv")
     if [row["label"] for row in trace] != labels:
         raise ValueError("video checkpoint sequence mismatch")
     layouts = []
@@ -208,6 +211,14 @@ def validate(directory, require_heap=False, require_watermark=False, require_irq
     state = rows(directory / "runtime-probe.csv")
     oam = rows(directory / "runtime-oam.csv")
     stack = rows(directory / "runtime-stack.csv")
+    # Baseline traces are just as authoritative as optional resource traces.
+    # Reject unexpected columns and malformed counters before interpreting
+    # hardware snapshots; otherwise a changed collector schema can pass silently.
+    require_counter_columns(state, ("label", "state"), "runtime-probe.csv")
+    require_counter_columns(oam, ("label", "enabled_oam_entries",
+                                  "display_mode", "obj_enabled"), "runtime-oam.csv")
+    require_counter_columns(stack, ("label", "sp", "bytes_above_iwram_base"),
+                            "runtime-stack.csv")
     labels = [row["label"] for row in state]
     if any([row["label"] for row in trace] != labels for trace in (oam, stack)):
         raise ValueError("resource checkpoint sequence differs from gameplay trace")
