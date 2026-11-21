@@ -243,7 +243,17 @@ def validate(directory, require_heap=False, require_stack_samples=False, require
     # Baseline traces are just as authoritative as optional resource traces.
     # Reject unexpected columns and malformed counters before interpreting
     # hardware snapshots; otherwise a changed collector schema can pass silently.
-    require_counter_columns(state, ("label", "state"), "runtime-probe.csv")
+    # The live collector emits the complete native encounter register set.
+    # A two-column "state" fixture must not masquerade as genuine replay.
+    require_counter_columns(state, (
+        "label", "trigger_count", "start_failure", "milestones",
+        "diagnostic_state", "post_cancel_moves", "last_outcome",
+        "last_human_hp", "last_enemy_hp", "outcome_acks",
+        "impact_starts", "impact_frames", "dash_count", "last_dash_movement",
+        "natural_encounter_count", "last_natural_local_id",
+        "natural_cleanup_status", "replay_fixture_status",
+        "replay_fixture_lock_count", "replay_natural_lock_count",
+        "replay_fixture_attempt_count"), "runtime-probe.csv")
     require_counter_columns(oam, ("label", "enabled_oam_entries",
                                   "display_mode", "obj_enabled"), "runtime-oam.csv")
     require_counter_columns(stack, ("label", "sp", "bytes_above_iwram_base"),
