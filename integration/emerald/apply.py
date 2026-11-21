@@ -59,6 +59,9 @@ EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
                         !pos->allocated ||
                         occupied < pos->size ||
                         occupied > gPokeDnDHeapCapacity ||
+                        gPokeDnDHeapCurrent == 0xFFFFFFFFu ||
+                        gPokeDnDHeapPeak == 0xFFFFFFFFu ||
+                        gPokeDnDHeapEpoch == 0xFFFFFFFFu ||
                         gPokeDnDHeapCurrent > gPokeDnDHeapCapacity - occupied)
                     {
                         gPokeDnDHeapCurrent = 0xFFFFFFFFu;
@@ -86,6 +89,8 @@ EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
                 occupied < block->size ||
                 occupied > gPokeDnDHeapCapacity ||
                 gPokeDnDHeapCurrent == 0xFFFFFFFFu ||
+                gPokeDnDHeapPeak == 0xFFFFFFFFu ||
+                gPokeDnDHeapEpoch == 0xFFFFFFFFu ||
                 occupied > gPokeDnDHeapCurrent)
             {
                 gPokeDnDHeapCurrent = 0xFFFFFFFFu;
