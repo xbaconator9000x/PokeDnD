@@ -46,6 +46,8 @@ FIELDS = ("label", "trigger_count", "start_failure", "milestones",
           "replay_fixture_attempt_count")
 
 
+STACK_SAMPLE_NAMES = ("gPokeDnDStackSamplePeak", "gPokeDnDStackSampleCount", "gPokeDnDStackSampleInvalid")
+
 HEAP_NAMES = ("gPokeDnDHeapCurrent", "gPokeDnDHeapPeak",
               "gPokeDnDHeapFailures", "gPokeDnDHeapCapacity", "gPokeDnDHeapEpoch")
 
@@ -234,7 +236,7 @@ def connect_gdb(port, timeout=25):
 
 def serve(elf, out, port, nm):
     out.mkdir(parents=True, exist_ok=True)
-    addresses = symbol_addresses(elf, nm, NAMES + HEAP_NAMES)
+    addresses = symbol_addresses(elf, nm, NAMES + HEAP_NAMES + STACK_SAMPLE_NAMES)
     bounds = stack_bounds(elf, nm)
     irq = irq_bounds(elf, nm)
     socket_path = out / "ewram-probe.sock"
@@ -251,6 +253,7 @@ def serve(elf, out, port, nm):
         (out / "runtime-oam.csv").write_text("label,enabled_oam_entries,display_mode,obj_enabled\n")
         (out / "runtime-stack.csv").write_text("label,sp,bytes_above_iwram_base\n")
         (out / "runtime-heap.csv").write_text("label,current,peak,failures,capacity,epoch\n")
+        (out / "runtime-stack-samples.csv").write_text("label,low,top,peak,samples,invalid\n")
         (out / "runtime-watermark.csv").write_text("label,low,top,used,untouched\\n".replace("\\n", "\n"))
         (out / "runtime-irq.csv").write_text("label,low,top,used,untouched\n")
         (out / "runtime-video.csv").write_text("label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt\n")
@@ -274,6 +277,8 @@ def serve(elf, out, port, nm):
                             csv.writer(stack_file).writerow([label, *values["stack"]])
                         with (out / "runtime-heap.csv").open("a", newline="") as heap_file:
                             csv.writer(heap_file).writerow([label, *[values[name] for name in HEAP_NAMES]])
+                        with (out / "runtime-stack-samples.csv").open("a", newline="") as samples_file:
+                            csv.writer(samples_file).writerow([label, *bounds, *[values[name] for name in STACK_SAMPLE_NAMES]])
                         with (out / "runtime-watermark.csv").open("a", newline="") as watermark_file:
                             csv.writer(watermark_file).writerow([label, *values["watermark"]])
                         with (out / "runtime-irq.csv").open("a", newline="") as irq_file:
