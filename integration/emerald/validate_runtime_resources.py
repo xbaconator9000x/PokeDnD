@@ -222,15 +222,19 @@ def validate(directory, require_heap=False, require_watermark=False, require_irq
 
 
 def main(argv):
-    if not argv or set(argv[1:]) - {"--require-vblank"}:
+    if not argv or argv[1:].count("--require-vblank") > 1 or set(argv[1:]) - {"--require-vblank"}:
         raise SystemExit("usage: validate_runtime_resources.py DIR [--require-vblank]")
     directory = Path(argv[0])
     require_vblank = "--require-vblank" in argv[1:]
+    # Never leave a successful verdict from an earlier replay when the current
+    # trace is missing, malformed, or over budget. A failed run must fail closed.
+    verdict_path = directory / "runtime-resource-verdict.json"
+    verdict_path.unlink(missing_ok=True)
     report = validate(directory, require_heap=True, require_watermark=True,
                       require_irq=True, require_video=True,
                       require_vblank=require_vblank)
     report["vblank_acceptance"] = "measured" if require_vblank else "not_measured"
-    (directory / "runtime-resource-verdict.json").write_text(
+    verdict_path.write_text(
         json.dumps(report, indent=2) + "\n")
     print("PASS: resource checkpoint integrity")
     return report
