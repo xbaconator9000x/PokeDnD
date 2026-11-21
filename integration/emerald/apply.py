@@ -104,8 +104,17 @@ EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
     gPokeDnDHeapCurrent = 0;
     gPokeDnDHeapPeak = 0;
     gPokeDnDHeapFailures = 0;
+    /* Zero capacity and wrapped epochs are invalid replay evidence.
+     * Keep the terminal sentinel across subsequent heap resets. */
     gPokeDnDHeapCapacity = heapSize;
-    gPokeDnDHeapEpoch++;"""),
+    if (heapSize == 0 || gPokeDnDHeapEpoch == 0xFFFFFFFFu)
+    {
+        gPokeDnDHeapCurrent = 0xFFFFFFFFu;
+        gPokeDnDHeapPeak = 0xFFFFFFFFu;
+        gPokeDnDHeapEpoch = 0xFFFFFFFFu;
+    }
+    else
+        gPokeDnDHeapEpoch++;"""),
     ]
     for old, new in edits:
         if source.count(old) != 1:
