@@ -104,7 +104,9 @@ EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
     /* An invalid epoch or counter is terminal for this replay.  A later
      * InitHeap must not launder an earlier allocation-accounting failure
      * into apparently valid evidence.  Only a fresh boot clears globals. */
-    if (heapSize == 0 ||\n        (gPokeDnDHeapEpoch != 0 && gPokeDnDHeapCurrent != 0) ||\n        gPokeDnDHeapEpoch == 0xFFFFFFFFu ||
+    if (heapSize == 0 ||
+        (gPokeDnDHeapEpoch != 0 && gPokeDnDHeapCurrent != 0) ||
+        gPokeDnDHeapEpoch == 0xFFFFFFFFu ||
         gPokeDnDHeapCurrent == 0xFFFFFFFFu ||
         gPokeDnDHeapPeak == 0xFFFFFFFFu ||
         gPokeDnDHeapFailures == 0xFFFFFFFFu)
