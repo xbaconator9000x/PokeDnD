@@ -54,3 +54,11 @@ class HeapInstrumentationTests(unittest.TestCase):
         self.assertIn("occupied > gPokeDnDHeapCurrent", result)
         self.assertIn("gPokeDnDHeapCurrent == 0xFFFFFFFFu", result)
         self.assertIn("gPokeDnDHeapCurrent -= occupied", result)
+
+    def test_reset_rejects_zero_capacity_and_epoch_rollover(self):
+        result = adapter.instrument_heap(FIXTURE)
+        self.assertIn("heapSize == 0", result)
+        self.assertIn("gPokeDnDHeapEpoch == 0xFFFFFFFFu", result)
+        self.assertIn("gPokeDnDHeapEpoch = 0xFFFFFFFFu", result)
+        self.assertIn("gPokeDnDHeapEpoch++;", result)
+        self.assertIn("gPokeDnDHeapPeak = 0xFFFFFFFFu", result)
