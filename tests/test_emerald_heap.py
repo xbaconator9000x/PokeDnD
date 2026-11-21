@@ -6,7 +6,7 @@ spec = importlib.util.spec_from_file_location("adapter", Path(__file__).resolve(
 adapter = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(adapter)
 
-FIXTURE = """static u32 sHeapSize;
+FIXTURE = """static u32 sHeapSize;\n// Alignment\n    if (size & 3)
 return pos->data;
 if (pos->next == head)
             return NULL;
@@ -115,3 +115,14 @@ class HeapInstrumentationTests(unittest.TestCase):
         self.assertLess(allocation.index("!pos->allocated"), allocation.index("gPokeDnDHeapCurrent += occupied"))
         self.assertIn("gPokeDnDHeapCurrent = 0xFFFFFFFFu;", allocation)
         self.assertIn("gPokeDnDHeapPeak = 0xFFFFFFFFu;", allocation)
+
+    def test_alignment_overflow_rejected_before_rounding(self):
+        result = adapter.instrument_heap(FIXTURE)
+        alloc = result.split("static void *", 1)[-1] if "static void *" in result else result
+        guard = "if (size > 0xFFFFFFFCu)"
+        self.assertIn(guard, alloc)
+        self.assertLess(alloc.index(guard), alloc.index("// Alignment"))
+        self.assertIn("gPokeDnDHeapFailures++", alloc[alloc.index(guard):alloc.index("// Alignment")])
+        self.assertIn("return NULL;", alloc[alloc.index(guard):alloc.index("// Alignment")])
+        with self.assertRaises(RuntimeError):
+            adapter.instrument_heap(FIXTURE.replace("// Alignment\\n    if (size & 3)", "// Alignment\\n    if (size & 7)"))
