@@ -234,7 +234,6 @@ class ResourceTests(unittest.TestCase):
             resources.validate(self.root, require_video=True)
 
 
-class HudAllocationTests(unittest.TestCase):
     def test_vblank_timer_budget_and_peak(self):
         self.write("runtime-vblank.csv",
                    "label,elapsed_ticks,peak_ticks,budget_ticks,epoch\n"
@@ -259,6 +258,8 @@ class HudAllocationTests(unittest.TestCase):
                 resources.validate(self.root, require_vblank=True)
 
 
+
+class HudAllocationTests(unittest.TestCase):
     def test_native_window_guard(self):
         import subprocess
         source = (Path(__file__).resolve().parents[1] /
