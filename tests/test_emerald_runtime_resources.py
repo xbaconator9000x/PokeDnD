@@ -178,6 +178,33 @@ class ResourceTests(unittest.TestCase):
         self.assertEqual(report["video_checkpoints"], 2)
         self.assertEqual(report["text_bg_layouts"][0]["screen_base"], 28)
 
+    def test_video_probe_rejects_extra_register(self):
+        self.write("runtime-video.csv",
+                   "label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt,unverified\n"
+                   "a,4352,0,12,7168,0,0,0,7\n"
+                   "b,4352,1,170,7168,0,0,0,7\n")
+        with self.assertRaisesRegex(ValueError, "missing or unexpected counter columns"):
+            resources.validate(self.root, require_video=True)
+
+    def test_video_probe_rejects_noncanonical_registers(self):
+        for bad in ("-1", "1.0", "garbage", " 1"):
+            self.write("runtime-video.csv",
+                       "label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt\n"
+                       "a,4352,0,12,7168,0,0,0\n"
+                       f"b,4352,{bad},170,7168,0,0,0\n")
+            with self.subTest(bad=bad), self.assertRaisesRegex(
+                    ValueError, "noncanonical unsigned counter"):
+                resources.validate(self.root, require_video=True)
+
+    def test_video_probe_rejects_forced_blank(self):
+        # DISPCNT bit 7 forces a blank display irrespective of BG registers.
+        self.write("runtime-video.csv",
+                   "label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt\n"
+                   "a,4352,0,12,7168,0,0,0\n"
+                   "b,4480,1,170,7168,0,0,0\n")
+        with self.assertRaisesRegex(ValueError, "forced-blank LCD"):
+            resources.validate(self.root, require_video=True)
+
     def test_bitmap_modes_without_bg_enable_fail_closed(self):
         # Bitmap framebuffers occupy VRAM regardless of BG enable bits.
         # Mode 1/2 affine layouts are also outside the text-BG model.
