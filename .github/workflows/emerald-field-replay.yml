@@ -28,6 +28,7 @@ jobs:
       - name: Replay boot and workflow source regression tests
         run: |
           python3 -m unittest discover -s tests -p 'test_emerald_heap.py' -v
+          python3 -m unittest discover -s tests -p 'test_emerald_stack_probe_isolation.py' -v
           python3 -m unittest discover -s tests -p 'test_emerald_field_boot.py' -v
           python3 -m unittest discover -s tests -p 'test_emerald_replay_workflow.py' -v
           python3 -m unittest discover -s tests -p 'test_emerald_gdb_probe.py' -v
