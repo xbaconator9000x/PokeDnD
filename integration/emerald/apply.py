@@ -51,7 +51,7 @@ EWRAM_DATA volatile u32 gPokeDnDHeapPeak = 0;
 EWRAM_DATA volatile u32 gPokeDnDHeapFailures = 0;
 EWRAM_DATA volatile u32 gPokeDnDHeapCapacity = 0;
 EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
-        ("return pos->data;", """/* Account for the allocator's actual block span, including header.
+        ("// Alignment\n    if (size & 3)", """/* Reject alignment overflow before the upstream round-up can wrap to zero.\n     * Count this as an allocation failure even for unchecked callers. */\n    if (size > 0xFFFFFFFCu)\n    {\n        if (gPokeDnDHeapFailures != 0xFFFFFFFFu)\n            gPokeDnDHeapFailures++;\n        return NULL;\n    }\n\n    // Alignment\n    if (size & 3)"""),\n        ("return pos->data;", """/* Account for the allocator's actual block span, including header.
                  * Saturate on corruption rather than wrap into a false low peak. */
                 {
                     u32 occupied = pos->size + sizeof(struct MemBlock);
