@@ -365,3 +365,60 @@ int main(void) {
                             str(src), "-o", str(exe)], check=True)
             subprocess.run([str(exe)], check=True)
 
+    def test_trainer_action_and_bonus_hud_flags(self):
+        """Compile the actual HUD formatter; guard all four resource states."""
+        import subprocess
+        source = (Path(__file__).resolve().parents[1] /
+                  "integration/emerald/pokednd_hud.c").read_text()
+        self.assertIn('sTxtTrainer[]   = _("L:ACT R:BON L+START:DASH B:END")', source)
+        self.assertIn('if (d20_current(battle) == sHumanId)\n'
+                      '        AppendTrainerBudget(line, human);', source)
+        self.assertIn('.width = 28', source)
+        self.assertIn('.height = 6', source)
+        formatter = source.split("static void AppendTrainerBudget", 1)[1].split(
+            "void PokeDnD_HudRedraw", 1)[0]
+        harness = r"""
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+typedef unsigned char u8;
+typedef struct { u8 action, bonus; } D20Unit;
+static const u8 sTxtActionBudget[] = " A";
+static const u8 sTxtBonusBudget[]  = " B";
+static void StringAppend(u8 *dest, const u8 *src)
+{
+    strcat((char *)dest, (const char *)src);
+}
+static void AppendNumber(u8 *dest, int value)
+{
+    char digits[12];
+    snprintf(digits, sizeof(digits), "%d", value);
+    strcat((char *)dest, digits);
+}
+static void AppendTrainerBudget
+""" + formatter + r"""
+static void verify(u8 action, u8 bonus, const char *expected)
+{
+    D20Unit human = {action, bonus};
+    u8 line[64] = "TURN";
+    AppendTrainerBudget(line, &human);
+    assert(strcmp((char *)line, expected) == 0);
+}
+int main(void)
+{
+    verify(1, 1, "TURN A1 B1");
+    verify(0, 1, "TURN A0 B1");
+    verify(1, 0, "TURN A1 B0");
+    verify(0, 0, "TURN A0 B0");
+    verify(2, 9, "TURN A1 B1");
+    return 0;
+}
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            src = Path(directory) / "hud_budget.c"
+            exe = Path(directory) / "hud_budget"
+            src.write_text(harness)
+            subprocess.run(["cc", "-std=c99", "-Wall", "-Wextra", "-Werror",
+                            str(src), "-o", str(exe)], check=True)
+            subprocess.run([str(exe)], check=True)
+
