@@ -62,6 +62,35 @@ def validate_heap(directory, labels):
             "heap_remaining_at_peak": previous[3] - previous[1]}
 
 
+def validate_stack_samples(directory, labels):
+    """Admit only linker-bounded native SP samples; never infer watermark writes."""
+    trace = rows(directory / "runtime-stack-samples.csv")
+    require_counter_columns(trace, ("label", "low", "top", "peak", "samples", "invalid"),
+                            "runtime-stack-samples.csv")
+    if [row["label"] for row in trace] != labels:
+        raise ValueError("native stack sampler checkpoint sequence mismatch")
+    previous_peak = previous_count = None
+    bounds = None
+    for row in trace:
+        low, top, peak, count, invalid = (int(row[k]) for k in
+            ("low", "top", "peak", "samples", "invalid"))
+        if not (0x03000000 <= low <= top - 1024 and top == 0x03007E40
+                and low % 4 == 0 and peak % 4 == 0
+                and 0 < peak <= top - low - 256 and 0 < count < 0xFFFFFFFF
+                and invalid == 0):
+            raise ValueError("invalid or over-budget native stack sample")
+        if bounds is not None and bounds != (low, top):
+            raise ValueError("native stack sampler linker bounds changed")
+        if previous_peak is not None and (peak < previous_peak or count < previous_count):
+            raise ValueError("native stack sampler counters regressed")
+        bounds = (low, top)
+        previous_peak, previous_count = peak, count
+    return {"system_stack_peak_sampled_bytes": previous_peak,
+            "system_stack_sample_count": previous_count,
+            "system_stack_capacity_bytes": bounds[1] - bounds[0],
+            "system_stack_sampled_reserve_bytes": bounds[1] - bounds[0] - previous_peak}
+
+
 def validate_watermark(directory, labels):
     trace = rows(directory / "runtime-watermark.csv")
     require_counter_columns(trace, ("label", "low", "top", "used", "untouched"),
@@ -207,7 +236,7 @@ def validate_vblank(directory, labels):
             "vblank_timer_remaining_ticks": previous_peak[2] - peak}
 
 
-def validate(directory, require_heap=False, require_watermark=False, require_irq=False, require_video=False, require_vblank=False):
+def validate(directory, require_heap=False, require_stack_samples=False, require_watermark=False, require_irq=False, require_video=False, require_vblank=False):
     state = rows(directory / "runtime-probe.csv")
     oam = rows(directory / "runtime-oam.csv")
     stack = rows(directory / "runtime-stack.csv")
@@ -240,6 +269,9 @@ def validate(directory, require_heap=False, require_watermark=False, require_irq
             "limitations": "OAM and stack are checkpoint samples; stack high-water remains unmeasured."}
     if require_heap:
         report.update(validate_heap(directory, labels))
+    if require_stack_samples:
+        report.update(validate_stack_samples(directory, labels))
+        report["limitations"] = "Read-only system stack samples; unsampled call paths and IRQ high-water remain unknown."
     if require_watermark:
         report.update(validate_watermark(directory, labels))
         report['limitations'] = 'System stack watermark measures overwritten words, not unwritten reservations; IRQ stack and OAM remain checkpoint observations.'
@@ -262,10 +294,12 @@ def main(argv):
     # trace is missing, malformed, or over budget. A failed run must fail closed.
     verdict_path = directory / "runtime-resource-verdict.json"
     verdict_path.unlink(missing_ok=True)
-    report = validate(directory, require_heap=True, require_watermark=True,
-                      require_irq=True, require_video=True,
+    report = validate(directory, require_heap=True, require_stack_samples=True,
+                      require_watermark=False, require_irq=False, require_video=True,
                       require_vblank=require_vblank)
     report["vblank_acceptance"] = "measured" if require_vblank else "not_measured"
+    report["stack_acceptance"] = "sampled_only_not_high_water"
+    report["irq_stack_acceptance"] = "not_measured"
     verdict_path.write_text(
         json.dumps(report, indent=2) + "\n")
     print("PASS: resource checkpoint integrity")
