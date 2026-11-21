@@ -16,6 +16,17 @@ block->allocated = FALSE;
 sHeapSize = heapSize;"""
 
 class HeapInstrumentationTests(unittest.TestCase):
+    def test_allocator_instrumentation_is_python_syntax_and_emits_c_lines(self):
+        # The edit table must contain real Python tuple separators, not
+        # escaped newline text accidentally pasted between tuple entries.
+        import ast
+        source = (Path(__file__).resolve().parents[1] /
+                  "integration/emerald/apply.py").read_text(encoding="utf-8")
+        ast.parse(source, filename="integration/emerald/apply.py")
+        emitted = adapter.instrument_heap(FIXTURE)
+        self.assertIn("if (size > 0xFFFFFFFCu)\n    {", emitted)
+        self.assertNotIn(r"0xFFFFFFFCu)\n    {", emitted)
+
     def test_hooks(self):
         result = adapter.instrument_heap(FIXTURE)
         for expression in (
