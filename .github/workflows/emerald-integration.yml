@@ -1,0 +1,120 @@
+name: POC-02 genuine Emerald overworld source integration
+on:
+  push:
+    paths:
+      - "integration/emerald/pokednd_overworld.c"
+      - "integration/emerald/pokednd_overworld.h"
+      - "integration/emerald/apply.py"
+      - "integration/emerald/audit_gba_memory.py"
+      - "tests/test_emerald_gba_memory.py"
+      - "include/d20*"
+      - "src/d20*"
+      - ".github/workflows/emerald-integration.yml"
+    branches:
+      - main
+  pull_request:
+    paths:
+      - "integration/emerald/pokednd_overworld.c"
+      - "integration/emerald/pokednd_overworld.h"
+      - "integration/emerald/apply.py"
+      - "integration/emerald/audit_gba_memory.py"
+      - "tests/test_emerald_gba_memory.py"
+      - "include/d20*"
+      - "src/d20*"
+      - ".github/workflows/emerald-integration.yml"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  emerald-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      GAME_VERSION: EMERALD
+      COMPARE: 0
+      UNUSED_ERROR: 1
+    steps:
+      - name: Checkout PokeDnD source only
+        uses: actions/checkout@v4
+      - name: Install native GBA cross-toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi \
+            libpng-dev python3 build-essential
+      - name: Regression-test GBA memory audit
+        run: python3 -m unittest discover -s tests -p "test_emerald_gba_memory.py" -v
+      - name: Fetch pinned upstream privately for build
+        run: |
+          git init upstream
+          git -C upstream remote add origin https://github.com/rh-hideout/pokeemerald-expansion.git
+          git -C upstream fetch --no-tags --depth=1 origin 4da9230cf7c1f1d7b0d47b45783b202666fffece
+          git -C upstream checkout --detach FETCH_HEAD
+          test "$(git -C upstream rev-parse HEAD)" = 4da9230cf7c1f1d7b0d47b45783b202666fffece
+      - name: Apply original source-only D20 hook
+        run: python3 integration/emerald/apply.py upstream
+      - name: Compile real pokeemerald-expansion ROM
+        run: |
+          make -C upstream -j4 all
+      - name: Verify native ARM hook linked into real Emerald ELF
+        run: |
+          ELF=upstream/pokeemerald.elf
+          test -s "$ELF"
+          arm-none-eabi-nm "$ELF" | grep ' PokeDnD_HandleOverworldInput$'
+          arm-none-eabi-nm "$ELF" | grep ' d20_field_project$'
+          arm-none-eabi-nm "$ELF" | grep ' d20_deploy$'
+          ROM=$(find upstream -maxdepth 1 -name '*.gba' | head -n 1)
+          test -n "$ROM"
+          test "$(stat -c %s "$ROM")" -le 33554432
+          echo "Native integrated Emerald image: $(stat -c %s "$ROM") bytes"
+          sha256sum "$ROM"
+      - name: Audit actual native ELF GBA memory allocations
+        run: |
+          mkdir -p evidence
+          python3 integration/emerald/audit_gba_memory.py upstream/pokeemerald.elf --output evidence/gba-memory-budget.json
+      - name: Install native mGBA and display capture
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mgba-sdl xvfb xdotool x11-apps imagemagick
+      - name: Native Emerald ROM boots to a rendered LCD screen
+        run: |
+          mkdir -p evidence
+          ROM=$(find upstream -maxdepth 1 -name '*.gba' -type f | head -n 1)
+          test -s "$ROM"
+          timeout 65s xvfb-run -a -s "-screen 0 800x600x24" bash -euo pipefail -c '
+            export SDL_VIDEODRIVER=x11 SDL_AUDIODRIVER=dummy
+            mgba "'"$ROM"'" >evidence/mgba.log 2>&1 &
+            EMU=$!
+            trap "kill -9 $EMU 2>/dev/null || true" EXIT
+            WINDOW=""
+            for i in $(seq 1 20); do
+              if ! kill -0 "$EMU" 2>/dev/null; then cat evidence/mgba.log; exit 1; fi
+              WINDOW=$(xdotool search --onlyvisible --name "mGBA" 2>/dev/null | sed -n "1p" || true)
+              [ -n "$WINDOW" ] && break
+              sleep 1
+            done
+            [ -n "$WINDOW" ] || { echo "No mGBA game window"; exit 1; }
+            # The boot splash briefly fades through black: count colors over
+            # several real LCD frames instead of sampling that transition.
+            for i in $(seq 1 12); do
+              timeout 5s xwd -silent -id "$WINDOW" | convert xwd:- evidence/emerald-native-lcd.png
+              COLORS=$(identify -format %k evidence/emerald-native-lcd.png)
+              echo "Emerald native mGBA LCD colors, sample $i: $COLORS"
+              [ "$COLORS" -gt 8 ] && exit 0
+              sleep 2
+            done
+            echo "No sufficiently rendered Emerald frame observed"
+            exit 1
+          '
+          test -s evidence/emerald-native-lcd.png
+          COLORS=$(identify -format %k evidence/emerald-native-lcd.png)
+          test "$COLORS" -gt 8
+      - name: Upload real mGBA LCD evidence only (NO ROM binaries)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pokednd-poc02-emerald-native-boot-evidence
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 7

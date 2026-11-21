@@ -90,7 +90,7 @@ static void label(int x,int y,const char *s,uint16_t color)
 }
 static void draw(void)
 {
-    int actor = d20_current(&battle);
+    int actor = d20_actor(&battle);
     fill(0,0,SCREEN_W,SCREEN_H,RGB(2,4,6));
     label(5,3,"POKEDND D20 GBA",RGB(31,29,20));
     for (int y=0;y<D20_H;y++) for(int x=0;x<D20_W;x++) {
@@ -108,18 +108,25 @@ static void draw(void)
         color=u->role==HUMAN?RGB(6,18,30):u->role==POKEMON?RGB(31,27,2):RGB(31,7,7);
         fill(sx+2,sy+2,7,8,color);
         glyph(sx+4,sy+3,u->role==HUMAN?'H':u->role==POKEMON?'P':'R',RGB(31,31,31));
+        if(u->role==POKEMON && u->dodging)
+            glyph(sx+8,sy+1,'D',RGB(31,31,31));
         if(i==actor) {
             fill(sx,sy,TILE-1,1,RGB(31,31,31)); fill(sx,sy,1,TILE-1,RGB(31,31,31));
         }
     }
+    /* Upper-right real-hardware action indicator: green means Pokémon
+     * has a commanded action available, red means that action was spent.
+     * It is rendered from the same D20 state used by attack acceptance. */
+    if(actor==pikachu)
+        fill(227,2,9,9,battle.units[pikachu].action?RGB(7,25,6):RGB(25,6,6));
     fill(0,136,SCREEN_W,24,RGB(3,5,9));
     if(battle.outcome==ALLIES_WIN) label(6,139,"VICTORY SELECT RESET",RGB(28,31,15));
     else if(battle.outcome==ENEMIES_WIN) label(6,139,"DEFEAT SELECT RESET",RGB(31,12,12));
     else {
         label(6,138,actor==hero?"HUMAN":actor==pikachu?"PIKACHU":"ROCKET",RGB(29,27,20));
-        label(98,138,"A ACT B END",RGB(29,27,20));
-        label(6,148,"DPAD MOVE SELECT RESET",RGB(19,25,31));
-        label(112,148,"L HIT R QUICK",RGB(19,25,31));
+        label(78,138,actor==hero?"L ACT R BONUS":"A BOLT R QUICK",RGB(29,27,20));
+        label(6,148,"B BACK OR END",RGB(19,25,31));
+        label(112,148,"START HIT SEL RESET",RGB(19,25,31));
     }
     for(int i=0;i<3;i++) {
         const D20Unit *u=&battle.units[i];
@@ -161,28 +168,36 @@ static void enemy_turn(void)
 }
 static void input(uint16_t keys)
 {
-    int who=d20_current(&battle);
+    int owner=d20_current(&battle);
+    int who=d20_actor(&battle);
     const D20Unit *u;
     int dx=0,dy=0;
     if(keys&KEY_SELECT) { reset(); return; }
+    if(owner<0) return;
+    if(owner==grunt) { enemy_turn(); return; }
     if(who<0) return;
-    if(who==grunt) { enemy_turn(); return; }
     u=&battle.units[who];
     if(keys&KEY_RIGHT)dx=1;
     else if(keys&KEY_LEFT)dx=-1;
     else if(keys&KEY_UP)dy=-1;
     else if(keys&KEY_DOWN)dy=1;
     if(dx||dy) (void)d20_walk(&battle,who,u->x+dx,u->y+dy);
-    if(keys&KEY_A) {
-        if(who==hero) {
+    if(who==hero) {
+        if((keys&KEY_A) && !battle.units[pikachu].deployed) {
             if(!d20_deploy(&battle,hero,pikachu,u->x+1,u->y))
                (void)d20_deploy(&battle,hero,pikachu,u->x,u->y+1);
-        } else (void)d20_attack(&battle,pikachu,grunt,THUNDERBOLT);
+        }
+        if(keys&KEY_L) (void)d20_command(&battle,hero,pikachu,false);
+        if(keys&KEY_R) (void)d20_command(&battle,hero,pikachu,true);
+        if(keys&KEY_START) (void)d20_attack(&battle,hero,grunt,TACKLE);
+        if((keys&KEY_B) && battle.outcome==FIGHTING) (void)d20_next(&battle);
+    } else if(who==pikachu) {
+        if(keys&KEY_A) (void)d20_attack(&battle,pikachu,grunt,THUNDERBOLT);
+        if(keys&KEY_R) (void)d20_attack(&battle,pikachu,grunt,QUICK_ATTACK);
+        if(keys&(KEY_B|KEY_START)) (void)d20_select(&battle,hero);
     }
-    if((keys&KEY_L) && who==hero) (void)d20_attack(&battle,hero,grunt,TACKLE);
-    if((keys&KEY_R) && who==pikachu) (void)d20_attack(&battle,pikachu,grunt,QUICK_ATTACK);
-    if((keys&KEY_B) && battle.outcome==FIGHTING) d20_next(&battle);
 }
+
 int main(void)
 {
     uint16_t previous=0;

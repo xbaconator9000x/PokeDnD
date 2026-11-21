@@ -1,14 +1,25 @@
 # PokéDND 🎲
 
-**Experimental project:** a Pokémon-inspired, top-down tactical CRPG grounded in the revised 2024 D&D 5e rules (SRD 5.2.1).
+**Core mission:** a reusable, creator-oriented D&D 5e (2024 / SRD 5.2.1) tactical RPG framework for Pokémon-derived overworld engines. **Pokémon mechanics are optional.** Creators can build conventional D&D campaigns with no Pokémon, Pokémon 5e (2024) campaigns, or hybrid adventures.
+
+**Fundamental architecture:** [Core architecture and GBA-first / DS-ready contract](docs/CORE_ARCHITECTURE.md). The shared portable C99 rules and campaign data must remain independent of both Pokémon-specific rules and Emerald internals. Finish the GBA/pokeemerald-expansion playable proof first; design adapter boundaries for a future Nintendo DS/Gen 4 port without splitting current development effort.
+
+**Current implementation status:** existing Rocket/Pikachu encounters, trainer-group initiative, command costs, and 3-human/2-Pokémon limits are experimental prototype mechanics, **not universal framework rules or verified Pokémon 5e (2024) defaults**. Native mGBA acceptance is still pending.
 
 ## Design
 
 - Gen III-style world, with turn-based battles **on the overworld map**.
-- Up to 3 humans, each commanding up to 2 Pokémon; independent party control.
+- Up to 3 humans, each commanding up to 2 Pokémon with **full direct party control**. **Now implemented in the portable engine:** Pokémon share their trainer's initiative and require an Action or Bonus Action command; uncommanded Pokémon Dodge. Native GBA/Emerald gameplay acceptance for this revision is still being tested.
 - Sending out a Pokémon costs one human Action.
 - D20 initiative and attacks, AC, proficiency, movement, six ability scores, and saving throws.
 - Species-specific attack ability mapping: e.g. Pikachu's Thunderbolt uses CHA.
+
+## External research and battle design
+
+- [Pokémon 5e (2024) research references](docs/research/pokemon-5e.md) — official site, community combat conversion and Foundry module links; no copied third-party files.
+- [Trainer-linked initiative and command economy](docs/design/trainer-initiative-and-commands.md) — **proposed PokéDND rule**: a human's Pokémon use their trainer's initiative; Action or Bonus Action to command; uncommanded Pokémon Dodge.
+
+The original separate-initiative POC-01 remains in Git history. The active POC-03 source now implements trainer-group initiative, explicit Pokémon commands and a basic Dodge defence; see [POC-03 implementation and verification](docs/POC-03.md).
 
 ## What actually exists
 
@@ -20,6 +31,10 @@
     make demo
 
 With devkitARM installed, build the standalone ROM using `make -C gba`. See [GBA demo controls](gba/README.md). Actual GBA boot evidence is in the `PokeDnD GBA hardware demo build` GitHub Actions artifacts.
+
+## POC-03 rules and controls
+
+A trainer's Action or Bonus Action can authorise one deployed Pokémon to act on the trainer's initiative; a Pokémon cannot be commanded twice in the same trainer turn. When uncommanded, it Dodges and incoming attacks roll with disadvantage. Pokémon deployment still consumes a human Action and cannot produce a free attack immediately. Both the standalone GBA and Emerald input adapters now expose the command action; their **current exact-head emulator acceptance is not yet established**. [Read the command contract](docs/design/trainer-initiative-and-commands.md).
 
 ## Next acceptance milestone
 
