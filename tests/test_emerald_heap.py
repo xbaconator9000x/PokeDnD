@@ -19,8 +19,8 @@ class HeapInstrumentationTests(unittest.TestCase):
     def test_hooks(self):
         result = adapter.instrument_heap(FIXTURE)
         for expression in (
-            "gPokeDnDHeapCurrent += pos->size + sizeof(struct MemBlock)",
-            "gPokeDnDHeapCurrent -= block->size + sizeof(struct MemBlock)",
+            "gPokeDnDHeapCurrent += occupied",
+            "gPokeDnDHeapCurrent -= occupied",
             "gPokeDnDHeapPeak = gPokeDnDHeapCurrent",
             "gPokeDnDHeapFailures++",
             "gPokeDnDHeapCapacity = heapSize",
@@ -39,3 +39,18 @@ class HeapInstrumentationTests(unittest.TestCase):
     def test_reapply_rejected(self):
         with self.assertRaises(RuntimeError):
             adapter.instrument_heap(adapter.instrument_heap(FIXTURE))
+
+    def test_accounting_fails_closed_on_overflow(self):
+        result = adapter.instrument_heap(FIXTURE)
+        self.assertIn("occupied < pos->size", result)
+        self.assertIn("occupied > gPokeDnDHeapCapacity", result)
+        self.assertIn("gPokeDnDHeapCurrent > gPokeDnDHeapCapacity - occupied", result)
+        self.assertIn("gPokeDnDHeapCurrent = 0xFFFFFFFFu", result)
+        self.assertIn("gPokeDnDHeapPeak = 0xFFFFFFFFu", result)
+
+    def test_accounting_fails_closed_on_underflow(self):
+        result = adapter.instrument_heap(FIXTURE)
+        self.assertIn("occupied < block->size", result)
+        self.assertIn("occupied > gPokeDnDHeapCurrent", result)
+        self.assertIn("gPokeDnDHeapCurrent == 0xFFFFFFFFu", result)
+        self.assertIn("gPokeDnDHeapCurrent -= occupied", result)
