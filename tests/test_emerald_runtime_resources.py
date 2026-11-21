@@ -258,6 +258,28 @@ class ResourceTests(unittest.TestCase):
                 resources.validate(self.root, require_vblank=True)
 
 
+    def test_cli_vblank_evidence_is_opt_in_and_labelled(self):
+        from unittest.mock import patch
+        with patch.object(resources, "validate", return_value={"checkpoints": 2}) as check:
+            report = resources.main([str(self.root)])
+            self.assertEqual(report["vblank_acceptance"], "not_measured")
+            self.assertFalse(check.call_args.kwargs["require_vblank"])
+            self.assertIn('"vblank_acceptance": "not_measured"',
+                          (self.root / "runtime-resource-verdict.json").read_text())
+        with patch.object(resources, "validate", return_value={"vblank_peak_timer_ticks": 25}) as check:
+            report = resources.main([str(self.root), "--require-vblank"])
+            self.assertEqual(report["vblank_acceptance"], "measured")
+            self.assertTrue(check.call_args.kwargs["require_vblank"])
+
+    def test_cli_required_vblank_propagates_missing_native_trace(self):
+        from unittest.mock import patch
+        with patch.object(resources, "validate", side_effect=FileNotFoundError("runtime-vblank.csv")):
+            with self.assertRaises(FileNotFoundError):
+                resources.main([str(self.root), "--require-vblank"])
+        with self.assertRaises(SystemExit):
+            resources.main([str(self.root), "--unknown"])
+
+
 
 class HudAllocationTests(unittest.TestCase):
     def test_native_window_guard(self):
