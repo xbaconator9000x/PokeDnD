@@ -97,7 +97,9 @@ EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
      * InitHeap must not launder an earlier allocation-accounting failure
      * into apparently valid evidence.  Only a fresh boot clears globals. */
     if (heapSize == 0 ||
-        (gPokeDnDHeapEpoch != 0 && gPokeDnDHeapCurrent != 0) ||
+        gPokeDnDHeapCurrent != 0 ||
+        (gPokeDnDHeapEpoch == 0 &&
+         (gPokeDnDHeapPeak != 0 || gPokeDnDHeapFailures != 0)) ||
         gPokeDnDHeapEpoch == 0xFFFFFFFFu ||
         gPokeDnDHeapCurrent == 0xFFFFFFFFu ||
         gPokeDnDHeapPeak == 0xFFFFFFFFu ||
