@@ -72,7 +72,7 @@ class HeapInstrumentationTests(unittest.TestCase):
         # InitHeap must not erase a nonzero current allocation counter.
         result = adapter.instrument_heap(FIXTURE)
         reset = result.split("sHeapSize = heapSize;", 1)[1]
-        guard = "(gPokeDnDHeapEpoch != 0 && gPokeDnDHeapCurrent != 0)"
+        guard = "gPokeDnDHeapCurrent != 0"
         self.assertIn(guard, reset)
         self.assertLess(reset.index(guard), reset.index("gPokeDnDHeapCurrent = 0;"))
         self.assertIn("gPokeDnDHeapCurrent = 0xFFFFFFFFu;", reset)
@@ -84,3 +84,11 @@ class HeapInstrumentationTests(unittest.TestCase):
         self.assertIn("gPokeDnDHeapEpoch = 0xFFFFFFFFu", result)
         self.assertIn("gPokeDnDHeapEpoch++;", result)
         self.assertIn("gPokeDnDHeapPeak = 0xFFFFFFFFu", result)
+
+    def test_first_epoch_dirty_counters_rejected(self):
+        result = adapter.instrument_heap(FIXTURE)
+        reset = result.split("sHeapSize = heapSize;", 1)[1]
+        self.assertIn("gPokeDnDHeapEpoch == 0 &&", reset)
+        self.assertIn("gPokeDnDHeapPeak != 0 || gPokeDnDHeapFailures != 0", reset)
+        self.assertLess(reset.index("gPokeDnDHeapCurrent != 0"), reset.index("gPokeDnDHeapCurrent = 0;"))
+        self.assertIn("gPokeDnDHeapEpoch = 0xFFFFFFFFu;", reset)
