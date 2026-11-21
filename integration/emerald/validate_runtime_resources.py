@@ -223,7 +223,16 @@ def validate(directory, require_heap=False, require_watermark=False, require_irq
 
 if __name__ == "__main__":
     directory = Path(sys.argv[1])
-    report = validate(directory, require_heap=True, require_watermark=True, require_irq=True, require_video=True)
+    # VBlank acceptance requires a caller-requested native timer trace.
+    # DISPSTAT/VCOUNT samples cannot establish execution time.
+    options = set(sys.argv[2:])
+    if options - {"--require-vblank"}:
+        raise SystemExit("usage: validate_runtime_resources.py DIR [--require-vblank]")
+    report = validate(directory, require_heap=True, require_watermark=True,
+                      require_irq=True, require_video=True,
+                      require_vblank="--require-vblank" in options)
+    report["vblank_acceptance"] = ("measured" if "--require-vblank" in options
+                                   else "not_measured")
     (directory / "runtime-resource-verdict.json").write_text(
         json.dumps(report, indent=2) + "\n")
     print("PASS: resource checkpoint integrity")
