@@ -271,6 +271,21 @@ class ResourceTests(unittest.TestCase):
             self.assertEqual(report["vblank_acceptance"], "measured")
             self.assertTrue(check.call_args.kwargs["require_vblank"])
 
+    def test_failed_replay_invalidates_prior_success_verdict(self):
+        # A previous run must never masquerade as acceptance of a later
+        # malformed or missing native replay.
+        from unittest.mock import patch
+        verdict = self.root / "runtime-resource-verdict.json"
+        verdict.write_text('{"vblank_acceptance": "measured"}\n')
+        with patch.object(resources, "validate", side_effect=FileNotFoundError("runtime-vblank.csv")):
+            with self.assertRaises(FileNotFoundError):
+                resources.main([str(self.root), "--require-vblank"])
+        self.assertFalse(verdict.exists())
+
+    def test_duplicate_required_vblank_flag_rejected(self):
+        with self.assertRaises(SystemExit):
+            resources.main([str(self.root), "--require-vblank", "--require-vblank"])
+
     def test_cli_required_vblank_propagates_missing_native_trace(self):
         from unittest.mock import patch
         with patch.object(resources, "validate", side_effect=FileNotFoundError("runtime-vblank.csv")):
