@@ -205,12 +205,12 @@ class ResourceTests(unittest.TestCase):
         for mode, enabled in ((1, 0x0400), (2, 0x0400), (3, 0x0400)):
             control = mode | enabled | 0x1000
             self.write("runtime-video.csv",
-                       "label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt\\n"
-                       f"a,{control},0,12,0,0,0,0\\n"
-                       f"b,{control},0,24,0,0,0,0\\n")
+                       "label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt\n"
+                       f"a,{control},0,12,0,0,0,0\n"
+                       f"b,{control},0,24,0,0,0,0\n")
             self.write("runtime-oam.csv",
-                       "label,enabled_oam_entries,display_mode,obj_enabled\\n"
-                       f"a,12,{mode},1\\nb,40,{mode},1\\n")
+                       "label,enabled_oam_entries,display_mode,obj_enabled\n"
+                       f"a,12,{mode},1\nb,40,{mode},1\n")
             with self.subTest(mode=mode), self.assertRaisesRegex(ValueError, "unsupported enabled BG"):
                 resources.validate(self.root, require_video=True)
 
