@@ -238,7 +238,6 @@ def serve(elf, out, port, nm):
     out.mkdir(parents=True, exist_ok=True)
     addresses = symbol_addresses(elf, nm, NAMES + HEAP_NAMES + STACK_SAMPLE_NAMES)
     bounds = stack_bounds(elf, nm)
-    irq = irq_bounds(elf, nm)
     socket_path = out / "ewram-probe.sock"
     csv_path = out / "runtime-probe.csv"
     ready_path = out / "ewram-probe-ready.txt"
@@ -254,8 +253,6 @@ def serve(elf, out, port, nm):
         (out / "runtime-stack.csv").write_text("label,sp,bytes_above_iwram_base\n")
         (out / "runtime-heap.csv").write_text("label,current,peak,failures,capacity,epoch\n")
         (out / "runtime-stack-samples.csv").write_text("label,low,top,peak,samples,invalid\n")
-        (out / "runtime-watermark.csv").write_text("label,low,top,used,untouched\\n".replace("\\n", "\n"))
-        (out / "runtime-irq.csv").write_text("label,low,top,used,untouched\n")
         (out / "runtime-video.csv").write_text("label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt\n")
         ready_path.write_text("mGBA GDB connected and native EWRAM symbols validated\n")
         try:
@@ -270,7 +267,7 @@ def serve(elf, out, port, nm):
                         client.sendall(b"ERROR invalid sample label\n")
                         continue
                     try:
-                        values = gdb.snapshot(addresses, resources=True, bounds=bounds, irq=irq)
+                        values = gdb.snapshot(addresses, resources=True)
                         with (out / "runtime-oam.csv").open("a", newline="") as resource_file:
                             csv.writer(resource_file).writerow([label, *values["resources"]])
                         with (out / "runtime-stack.csv").open("a", newline="") as stack_file:
@@ -279,10 +276,6 @@ def serve(elf, out, port, nm):
                             csv.writer(heap_file).writerow([label, *[values[name] for name in HEAP_NAMES]])
                         with (out / "runtime-stack-samples.csv").open("a", newline="") as samples_file:
                             csv.writer(samples_file).writerow([label, *bounds, *[values[name] for name in STACK_SAMPLE_NAMES]])
-                        with (out / "runtime-watermark.csv").open("a", newline="") as watermark_file:
-                            csv.writer(watermark_file).writerow([label, *values["watermark"]])
-                        with (out / "runtime-irq.csv").open("a", newline="") as irq_file:
-                            csv.writer(irq_file).writerow([label, *values["irq"]])
                         with (out / "runtime-video.csv").open("a", newline="") as video_file:
                             csv.writer(video_file).writerow([label, *values["video"]])
                         row = [label] + [values[name] for name in NAMES]
