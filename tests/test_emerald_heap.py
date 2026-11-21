@@ -92,3 +92,12 @@ class HeapInstrumentationTests(unittest.TestCase):
         self.assertIn("gPokeDnDHeapPeak != 0 || gPokeDnDHeapFailures != 0", reset)
         self.assertLess(reset.index("gPokeDnDHeapCurrent != 0"), reset.index("gPokeDnDHeapCurrent = 0;"))
         self.assertIn("gPokeDnDHeapEpoch = 0xFFFFFFFFu;", reset)
+
+    def test_double_free_and_corrupt_span_fail_closed(self):
+        result = adapter.instrument_heap(FIXTURE)
+        free = result.split("/* Preserve the invalid sentinel across subsequent frees. */", 1)[1]
+        self.assertIn("!block->allocated", free)
+        self.assertIn("occupied > gPokeDnDHeapCapacity", free)
+        self.assertLess(free.index("!block->allocated"), free.index("gPokeDnDHeapCurrent -= occupied;"))
+        self.assertLess(free.index("occupied > gPokeDnDHeapCapacity"), free.index("gPokeDnDHeapCurrent -= occupied;"))
+        self.assertIn("gPokeDnDHeapPeak = 0xFFFFFFFFu;", free)
