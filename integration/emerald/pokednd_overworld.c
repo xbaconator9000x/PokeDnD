@@ -35,9 +35,9 @@ EWRAM_DATA volatile u32 gPokeDnDStackSampleCount;
 EWRAM_DATA volatile u32 gPokeDnDStackSampleInvalid;
 static void PokeDnD_SampleSystemStack(void)
 {
-    uintptr_t sp;
-    uintptr_t low = (uintptr_t)__pokednd_stack_low;
-    uintptr_t top = (uintptr_t)__pokednd_stack_top;
+    u32 sp;
+    u32 low = (u32)__pokednd_stack_low;
+    u32 top = (u32)__pokednd_stack_top;
     u32 depth;
     __asm__ volatile ("mov %0, sp" : "=r" (sp));
     if (low >= top || sp < low || sp > top ||
