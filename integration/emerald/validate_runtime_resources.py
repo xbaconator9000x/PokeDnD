@@ -121,8 +121,11 @@ def validate_video(directory, labels, oam):
         # This accounting models text BGs in mode 0 only. Modes 1-5 use
         # affine/bitmap layouts: silently treating their enabled backgrounds
         # as zero occupancy would falsely certify a resource budget.
-        if control & 7 != 0 and control & 0x0F00:
-            raise ValueError("unsupported enabled BG display mode for VRAM budget")
+        if control & 7 != 0:
+            # Bitmap modes 3-5 consume framebuffer VRAM even when BG enable
+            # bits are clear. Affine modes also need separate allocation rules.
+            # Never certify an unmodelled mode as zero-byte occupancy.
+            raise ValueError("unsupported GBA display mode for VRAM budget")
         # Text BG screen blocks occupy 2 KiB apiece. Character blocks
         # identify bases only; these are not allocator occupancy measurements.
         if control & 7 == 0:
