@@ -96,6 +96,8 @@ class HeapInstrumentationTests(unittest.TestCase):
     def test_double_free_and_corrupt_span_fail_closed(self):
         result = adapter.instrument_heap(FIXTURE)
         free = result.split("/* Preserve the invalid sentinel across subsequent frees. */", 1)[1]
+        self.assertIn("block->magic != MALLOC_SYSTEM_ID", free)
+        self.assertLess(free.index("block->magic != MALLOC_SYSTEM_ID"), free.index("gPokeDnDHeapCurrent -= occupied;"))
         self.assertIn("!block->allocated", free)
         self.assertIn("occupied > gPokeDnDHeapCapacity", free)
         self.assertLess(free.index("!block->allocated"), free.index("gPokeDnDHeapCurrent -= occupied;"))
