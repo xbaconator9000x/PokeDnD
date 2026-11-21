@@ -122,6 +122,9 @@ def validate_irq(directory, labels):
 
 def validate_video(directory, labels, oam):
     trace = rows(directory / "runtime-video.csv")
+    require_counter_columns(trace, ("label", "dispcnt", "dispstat", "vcount",
+                                    "bg0cnt", "bg1cnt", "bg2cnt", "bg3cnt"),
+                            "runtime-video.csv")
     if [row["label"] for row in trace] != labels:
         raise ValueError("video checkpoint sequence mismatch")
     layouts = []
@@ -135,6 +138,8 @@ def validate_video(directory, labels, oam):
             raise ValueError("invalid video register width")
         if not 0 <= line < 228:
             raise ValueError("invalid GBA scanline")
+        if control & 0x0080:
+            raise ValueError("forced-blank LCD cannot establish visible gameplay")
         if control & 7 != int(sprite["display_mode"]) or bool(control & 0x1000) != bool(int(sprite["obj_enabled"])):
             raise ValueError("inconsistent display control snapshots")
         # This accounting models text BGs in mode 0 only. Modes 1-5 use
