@@ -151,7 +151,39 @@ def validate_video(directory, labels, oam):
             "video_limitations": "Register snapshots only; character spans represent nominal 16 KiB base blocks, not actual tile usage or allocator ownership; no VBlank duration."}
 
 
-def validate(directory, require_heap=False, require_watermark=False, require_irq=False, require_video=False):
+
+def validate_vblank(directory, labels):
+    """Validate measured VBlank timer deltas, not sampled DISPSTAT flags.
+
+    This trace is admissible only when native instrumentation provides timer
+    ticks around the actual VBlank work. A scanline sample is insufficient.
+    """
+    trace = rows(directory / "runtime-vblank.csv")
+    if [row["label"] for row in trace] != labels:
+        raise ValueError("VBlank checkpoint sequence mismatch")
+    peak = 0
+    previous_peak = None
+    for row in trace:
+        ticks = int(row["elapsed_ticks"])
+        high = int(row["peak_ticks"])
+        budget = int(row["budget_ticks"])
+        epoch = int(row["epoch"])
+        if not (epoch > 0 and budget > 0 and 0 <= ticks <= high <= budget):
+            raise ValueError("VBlank timer budget exceeded or invalid")
+        if previous_peak is not None and (high < previous_peak[0]
+                                          or epoch != previous_peak[1]
+                                          or budget != previous_peak[2]):
+            raise ValueError("VBlank timer epoch or high-water regression")
+        previous_peak = (high, epoch, budget)
+        peak = max(peak, high)
+    if peak == 0:
+        raise ValueError("no native VBlank timer activity measured")
+    return {"vblank_peak_timer_ticks": peak,
+            "vblank_timer_budget_ticks": previous_peak[2],
+            "vblank_timer_remaining_ticks": previous_peak[2] - peak}
+
+
+def validate(directory, require_heap=False, require_watermark=False, require_irq=False, require_video=False, require_vblank=False):
     state = rows(directory / "runtime-probe.csv")
     oam = rows(directory / "runtime-oam.csv")
     stack = rows(directory / "runtime-stack.csv")
@@ -184,12 +216,14 @@ def validate(directory, require_heap=False, require_watermark=False, require_irq
         report["limitations"] = "Stack watermarks measure overwritten words, not unwritten reservations; OAM is sampled."
     if require_video:
         report.update(validate_video(directory, labels, oam))
+    if require_vblank:
+        report.update(validate_vblank(directory, labels))
     return report
 
 
 if __name__ == "__main__":
     directory = Path(sys.argv[1])
-    report = validate(directory, require_heap=True, require_watermark=True, require_irq=True, require_video=True)
+    report = validate(directory, require_heap=True, require_watermark=True, require_irq=True, require_video=True, require_vblank=True)
     (directory / "runtime-resource-verdict.json").write_text(
         json.dumps(report, indent=2) + "\n")
     print("PASS: resource checkpoint integrity")
