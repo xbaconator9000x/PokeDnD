@@ -22,6 +22,25 @@ class StackProbeBuildIsolationTests(unittest.TestCase):
                          "#ifdef POKEDND_NATIVE_REPLAY_ROCKET")
         self.assertEqual(source[call:].splitlines()[1], "#endif")
 
+    def test_stack_probe_fails_closed_on_corrupt_samples(self):
+        source = SOURCE.read_text(encoding="utf-8")
+        start = source.index("static void PokeDnD_SampleSystemStack(void)")
+        end = source.index("#endif /* POKEDND_NATIVE_REPLAY_ROCKET */", start)
+        probe = source[start:end]
+        for guard in (
+            "low >= top", "(low & 3u)", "(top & 3u)",
+            "sp < low", "sp > top", "(sp & 3u)",
+            "gPokeDnDStackSampleCount == 0xFFFFFFFFu",
+            "gPokeDnDStackSamplePeak > top - low",
+            "gPokeDnDStackSampleCount == 0u && gPokeDnDStackSamplePeak != 0u",
+        ):
+            self.assertIn(guard, probe)
+        self.assertLess(probe.index("gPokeDnDStackSampleInvalid = 1;"),
+                        probe.index("gPokeDnDStackSampleCount++;"))
+        self.assertIn("if (gPokeDnDStackSampleInvalid)\\n        return;", probe)
+        self.assertNotIn("memset(", probe)
+        self.assertNotIn("0xA5", probe)
+
     def test_replay_flag_and_linker_patching_are_coupled(self):
         patcher = PATCHER.read_text(encoding="utf-8")
         self.assertIn('stack_modified, linker_modified = instrument_stack(', patcher)
