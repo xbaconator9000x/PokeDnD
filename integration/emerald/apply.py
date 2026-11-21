@@ -79,7 +79,8 @@ EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
         ("block->allocated = FALSE;\n\n        // If", """/* Preserve the invalid sentinel across subsequent frees. */
         {
             u32 occupied = block->size + sizeof(struct MemBlock);
-            if (!block->allocated ||
+            if (block->magic != MALLOC_SYSTEM_ID ||
+                !block->allocated ||
                 occupied < block->size ||
                 occupied > gPokeDnDHeapCapacity ||
                 gPokeDnDHeapCurrent == 0xFFFFFFFFu ||
