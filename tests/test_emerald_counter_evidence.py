@@ -54,5 +54,29 @@ class CounterEvidenceTests(unittest.TestCase):
                         module.validate_vblank(root, ["boot"])
 
 
+    def test_stack_watermarks_reject_extra_columns_and_noncanonical_values(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            # The system stack lower bound must be aligned and leave >=256 bytes.
+            system_low = 0x03007E40 - 2048
+            cases = (
+                ("runtime-watermark.csv", module.validate_watermark,
+                 f"boot,{system_low},50363968,256,1792"),
+                ("runtime-irq.csv", module.validate_irq,
+                 "boot,50363968,50364320,64,288"),
+            )
+            header = "label,low,top,used,untouched"
+            for filename, validator, valid in cases:
+                with self.subTest(filename=filename):
+                    self.write(root, filename, header, valid)
+                    self.assertTrue(validator(root, ["boot"]))
+                    self.write(root, filename, header + ",ignored", valid + ",1")
+                    with self.assertRaises(ValueError):
+                        validator(root, ["boot"])
+                    self.write(root, filename, header, valid.replace(",64,", ",+64,").replace(",256,", ",+256,"))
+                    with self.assertRaises(ValueError):
+                        validator(root, ["boot"])
+
+
 if __name__ == "__main__":
     unittest.main()
