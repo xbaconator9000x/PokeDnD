@@ -68,6 +68,15 @@ class HeapInstrumentationTests(unittest.TestCase):
         self.assertIn("gPokeDnDHeapEpoch = 0xFFFFFFFFu;", reset[:clear])
         self.assertIn("gPokeDnDHeapEpoch++;", reset[clear:])
 
+    def test_reset_rejects_live_allocations(self):
+        # InitHeap must not erase a nonzero current allocation counter.
+        result = adapter.instrument_heap(FIXTURE)
+        reset = result.split("sHeapSize = heapSize;", 1)[1]
+        guard = "(gPokeDnDHeapEpoch != 0 && gPokeDnDHeapCurrent != 0)"
+        self.assertIn(guard, reset)
+        self.assertLess(reset.index(guard), reset.index("gPokeDnDHeapCurrent = 0;"))
+        self.assertIn("gPokeDnDHeapCurrent = 0xFFFFFFFFu;", reset)
+
     def test_reset_rejects_zero_capacity_and_epoch_rollover(self):
         result = adapter.instrument_heap(FIXTURE)
         self.assertIn("heapSize == 0", result)
