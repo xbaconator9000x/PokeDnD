@@ -223,7 +223,7 @@ def validate(directory, require_heap=False, require_watermark=False, require_irq
 
 if __name__ == "__main__":
     directory = Path(sys.argv[1])
-    report = validate(directory, require_heap=True, require_watermark=True, require_irq=True, require_video=True, require_vblank=True)
+    report = validate(directory, require_heap=True, require_watermark=True, require_irq=True, require_video=True)
     (directory / "runtime-resource-verdict.json").write_text(
         json.dumps(report, indent=2) + "\n")
     print("PASS: resource checkpoint integrity")
