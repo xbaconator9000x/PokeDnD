@@ -26,6 +26,38 @@ class ResourceTests(unittest.TestCase):
         self.assertEqual(result["max_sampled_oam_entries"], 40)
         self.assertEqual(result["min_sampled_sp"], 50364408)
 
+    def test_baseline_trace_schema_fail_closed(self):
+        original = {
+            "runtime-probe.csv": "label,state\\na,0\\nb,1\\n",
+            "runtime-oam.csv": "label,enabled_oam_entries,display_mode,obj_enabled\\na,12,0,1\\nb,40,0,1\\n",
+            "runtime-stack.csv": "label,sp,bytes_above_iwram_base\\na,50364412,32764\\nb,50364408,32760\\n",
+        }
+        cases = (
+            ("runtime-probe.csv", "label,state,unexpected\\na,0,1\\nb,1,1\\n"),
+            ("runtime-oam.csv", "label,enabled_oam_entries,display_mode,obj_enabled,extra\\na,12,0,1,0\\nb,40,0,1,0\\n"),
+            ("runtime-stack.csv", "label,sp,bytes_above_iwram_base,extra\\na,50364412,32764,0\\nb,50364408,32760,0\\n"),
+            ("runtime-oam.csv", "label,enabled_oam_entries,display_mode,obj_enabled\\na,+12,0,1\\nb,40,0,1\\n"),
+            ("runtime-stack.csv", "label,sp,bytes_above_iwram_base\\na,50364412,32764\\nb,50364408,3.0\\n"),
+        )
+        for filename, invalid in cases:
+            with self.subTest(filename=filename, invalid=invalid):
+                for name, content in original.items():
+                    self.write(name, content)
+                self.write(filename, invalid)
+                with self.assertRaisesRegex(ValueError, "counter|columns"):
+                    resources.validate(self.root)
+
+    def test_video_trace_schema_fail_closed(self):
+        good = ("label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt\\n"
+                "a,4352,0,12,7168,0,0,0\\nb,4352,1,170,7168,0,0,0\\n")
+        for invalid in (good.replace("bg3cnt", "bg3cnt,extra").replace("0,0,0\\n", "0,0,0,0\\n"),
+                        good.replace("4352,1,170", "+4352,1,170"),
+                        good.replace("bg3cnt", "bg3cnt,extra")):
+            with self.subTest(invalid=invalid):
+                self.write("runtime-video.csv", invalid)
+                with self.assertRaises(ValueError):
+                    resources.validate(self.root, require_video=True)
+
     def test_missing(self):
         (self.root / "runtime-stack.csv").unlink()
         with self.assertRaises(FileNotFoundError):
