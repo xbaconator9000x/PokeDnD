@@ -59,9 +59,24 @@ EWRAM_DATA volatile u32 gPokeDnDHeapPeak = 0;
 EWRAM_DATA volatile u32 gPokeDnDHeapFailures = 0;
 EWRAM_DATA volatile u32 gPokeDnDHeapCapacity = 0;
 EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
-        ("return pos->data;", """gPokeDnDHeapCurrent += pos->size + sizeof(struct MemBlock);
-                if (gPokeDnDHeapCurrent > gPokeDnDHeapPeak)
-                    gPokeDnDHeapPeak = gPokeDnDHeapCurrent;
+        ("return pos->data;", """/* Account for the allocator's actual block span, including header.
+                 * Saturate on corruption rather than wrap into a false low peak. */
+                {
+                    u32 occupied = pos->size + sizeof(struct MemBlock);
+                    if (occupied < pos->size ||
+                        occupied > gPokeDnDHeapCapacity ||
+                        gPokeDnDHeapCurrent > gPokeDnDHeapCapacity - occupied)
+                    {
+                        gPokeDnDHeapCurrent = 0xFFFFFFFFu;
+                        gPokeDnDHeapPeak = 0xFFFFFFFFu;
+                    }
+                    else
+                    {
+                        gPokeDnDHeapCurrent += occupied;
+                        if (gPokeDnDHeapCurrent > gPokeDnDHeapPeak)
+                            gPokeDnDHeapPeak = gPokeDnDHeapCurrent;
+                    }
+                }
                 return pos->data;"""),
         ("if (pos->next == head)\n            return NULL;", """if (pos->next == head)
         {
@@ -69,7 +84,19 @@ EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
                 gPokeDnDHeapFailures++;
             return NULL;
         }"""),
-        ("block->allocated = FALSE;\n\n        // If", """gPokeDnDHeapCurrent -= block->size + sizeof(struct MemBlock);
+        ("block->allocated = FALSE;\n\n        // If", """/* Preserve the invalid sentinel across subsequent frees. */
+        {
+            u32 occupied = block->size + sizeof(struct MemBlock);
+            if (occupied < block->size ||
+                gPokeDnDHeapCurrent == 0xFFFFFFFFu ||
+                occupied > gPokeDnDHeapCurrent)
+            {
+                gPokeDnDHeapCurrent = 0xFFFFFFFFu;
+                gPokeDnDHeapPeak = 0xFFFFFFFFu;
+            }
+            else
+                gPokeDnDHeapCurrent -= occupied;
+        }
         block->allocated = FALSE;
 
         // If"""),
