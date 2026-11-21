@@ -41,8 +41,14 @@ static void PokeDnD_SampleSystemStack(void)
     u32 top = (u32)__pokednd_stack_top;
     u32 depth;
     __asm__ volatile ("mov %0, sp" : "=r" (sp));
-    if (low >= top || sp < low || sp > top ||
-        gPokeDnDStackSampleCount == 0xFFFFFFFFu)
+    /* The ARM system stack is word-aligned. Reject impossible bounds,
+     * misaligned samples, poisoned counters and inconsistent prior peaks.
+     * Never repair invalid evidence by clamping it to a plausible value. */
+    if (low >= top || (low & 3u) || (top & 3u) ||
+        sp < low || sp > top || (sp & 3u) ||
+        gPokeDnDStackSampleCount == 0xFFFFFFFFu ||
+        gPokeDnDStackSamplePeak > top - low ||
+        (gPokeDnDStackSampleCount == 0u && gPokeDnDStackSamplePeak != 0u))
     {
         gPokeDnDStackSampleInvalid = 1;
         return;
