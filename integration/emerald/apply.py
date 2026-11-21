@@ -16,29 +16,21 @@ SOURCE = Path(__file__).resolve().parents[2]
 
 
 def instrument_stack(startup, linker):
-    """Paint only unused system stack at boot, before any IRQ or C call."""
-    anchor = "\tbl InitializeWorkingMemory\n"
+    """Expose linker-grounded stack limits without touching live stack memory.
+
+    The previous boot-time paint ran after InitializeWorkingMemory, when the
+    system stack was already active. Writing from .iwram.bss to the system SP
+    can overwrite live frames. No stack watermark may be claimed until a
+    separately verified, pre-stack-use instrumentation point exists.
+    """
     boundary = "    /* BEGIN ROM DATA */"
-    if startup.count(anchor) != 1 or linker.count(boundary) != 1:
-        raise RuntimeError("Pinned stack startup/linker anchor mismatch")
+    if linker.count(boundary) != 1:
+        raise RuntimeError("Pinned stack linker anchor mismatch")
     if ("sp_sys: .word IWRAM_END - 0x1c0" not in startup
             or "sp_irq: .word IWRAM_END - 0x60" not in startup):
-        raise RuntimeError("Pinned system stack top changed")
-    startup = startup.replace(anchor, anchor + """
-\tldr r0, =__pokednd_stack_low
-\tldr r1, =__pokednd_stack_top
-\tldr r2, =0xA55A3CC3
-1:
-\tcmp r0, r1
-\tstrlo r2, [r0], #4
-\tblo 1b
-\tldr r0, =__pokednd_irq_low
-\tldr r1, =__pokednd_irq_top
-2:
-\tcmp r0, r1
-\tstrlo r2, [r0], #4
-\tblo 2b
-""".replace("\\t", "\t"), 1)
+        raise RuntimeError("Pinned system/IRQ stack tops changed")
+    if "__pokednd_stack_low" in linker or "__pokednd_stack_low" in startup:
+        raise RuntimeError("Stack instrumentation already installed")
     linker = linker.replace(boundary, """
     __pokednd_stack_low = ALIGN(ADDR(.iwram.bss) + SIZEOF(.iwram.bss), 4);
     __pokednd_stack_top = ORIGIN(IWRAM) + LENGTH(IWRAM) - 0x1c0;
