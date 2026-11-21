@@ -24,8 +24,23 @@ def rows(path):
     return result
 
 
+def require_counter_columns(trace, expected, name):
+    """Reject silently ignored columns in native counter evidence."""
+    if not trace or set(trace[0]) != set(expected):
+        raise ValueError(f"{name}: missing or unexpected counter columns")
+    for row in trace:
+        for field in expected:
+            if field == "label":
+                continue
+            value = row[field]
+            if not value.isascii() or not value.isdecimal():
+                raise ValueError(f"{name}: noncanonical unsigned counter {field}")
+
+
 def validate_heap(directory, labels):
     heap = rows(directory / "runtime-heap.csv")
+    require_counter_columns(heap, ("label", "current", "peak", "failures",
+                                   "capacity", "epoch"), "runtime-heap.csv")
     if [row["label"] for row in heap] != labels:
         raise ValueError("heap checkpoint sequence differs from gameplay trace")
     previous = None
@@ -159,6 +174,8 @@ def validate_vblank(directory, labels):
     ticks around the actual VBlank work. A scanline sample is insufficient.
     """
     trace = rows(directory / "runtime-vblank.csv")
+    require_counter_columns(trace, ("label", "elapsed_ticks", "peak_ticks",
+                                    "budget_ticks", "epoch"), "runtime-vblank.csv")
     if [row["label"] for row in trace] != labels:
         raise ValueError("VBlank checkpoint sequence mismatch")
     peak = 0
