@@ -103,3 +103,15 @@ class HeapInstrumentationTests(unittest.TestCase):
         self.assertLess(free.index("!block->allocated"), free.index("gPokeDnDHeapCurrent -= occupied;"))
         self.assertLess(free.index("occupied > gPokeDnDHeapCapacity"), free.index("gPokeDnDHeapCurrent -= occupied;"))
         self.assertIn("gPokeDnDHeapPeak = 0xFFFFFFFFu;", free)
+
+    def test_allocated_header_integrity_precedes_accounting(self):
+        # Upstream AllocInternal sets allocated and retains MALLOC_SYSTEM_ID.
+        # Corrupted headers must poison the evidence before a peak is recorded.
+        result = adapter.instrument_heap(FIXTURE)
+        allocation = result.split("/* Account for the allocator's actual block span", 1)[1].split("return pos->data;", 1)[0]
+        self.assertIn("pos->magic != MALLOC_SYSTEM_ID", allocation)
+        self.assertIn("!pos->allocated", allocation)
+        self.assertLess(allocation.index("pos->magic != MALLOC_SYSTEM_ID"), allocation.index("gPokeDnDHeapCurrent += occupied"))
+        self.assertLess(allocation.index("!pos->allocated"), allocation.index("gPokeDnDHeapCurrent += occupied"))
+        self.assertIn("gPokeDnDHeapCurrent = 0xFFFFFFFFu;", allocation)
+        self.assertIn("gPokeDnDHeapPeak = 0xFFFFFFFFu;", allocation)
