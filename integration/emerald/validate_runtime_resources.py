@@ -64,6 +64,8 @@ def validate_heap(directory, labels):
 
 def validate_watermark(directory, labels):
     trace = rows(directory / "runtime-watermark.csv")
+    require_counter_columns(trace, ("label", "low", "top", "used", "untouched"),
+                            "runtime-watermark.csv")
     if [row["label"] for row in trace] != labels:
         raise ValueError("stack watermark checkpoint sequence mismatch")
     bounds = None
@@ -94,6 +96,8 @@ def validate_watermark(directory, labels):
 
 def validate_irq(directory, labels):
     trace = rows(directory / "runtime-irq.csv")
+    require_counter_columns(trace, ("label", "low", "top", "used", "untouched"),
+                            "runtime-irq.csv")
     if [row["label"] for row in trace] != labels:
         raise ValueError("IRQ checkpoint sequence mismatch")
     peak = 0
