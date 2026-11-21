@@ -25,6 +25,35 @@
 #include "constants/event_objects.h"
 #include "constants/event_object_movement.h"
 
+/* Read-only stack sampling: linker symbols are emitted by instrument_stack.
+ * This is the deepest SP observed at the field callback, NOT a whole-program
+ * high-water mark. Never paint a live stack or claim unsampled frames. */
+extern u8 __pokednd_stack_low[];
+extern u8 __pokednd_stack_top[];
+EWRAM_DATA volatile u32 gPokeDnDStackSamplePeak;
+EWRAM_DATA volatile u32 gPokeDnDStackSampleCount;
+EWRAM_DATA volatile u32 gPokeDnDStackSampleInvalid;
+static void PokeDnD_SampleSystemStack(void)
+{
+    uintptr_t sp;
+    uintptr_t low = (uintptr_t)__pokednd_stack_low;
+    uintptr_t top = (uintptr_t)__pokednd_stack_top;
+    u32 depth;
+    __asm__ volatile ("mov %0, sp" : "=r" (sp));
+    if (low >= top || sp < low || sp > top ||
+        gPokeDnDStackSampleCount == 0xFFFFFFFFu)
+    {
+        gPokeDnDStackSampleInvalid = 1;
+        return;
+    }
+    if (gPokeDnDStackSampleInvalid)
+        return;
+    depth = (u32)(top - sp);
+    if (depth > gPokeDnDStackSamplePeak)
+        gPokeDnDStackSamplePeak = depth;
+    gPokeDnDStackSampleCount++;
+}
+
 /* These local IDs are reserved only while this debug fight is active. */
 #define D20_ROCKET_LOCAL_ID 231
 #define D20_PIKACHU_LOCAL_ID 232
@@ -792,6 +821,7 @@ static bool8 TryRocketFieldEncounter(u16 newKeys)
 bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
 {
     int id;
+    PokeDnD_SampleSystemStack();
     if (!sActive) {
 #ifdef POKEDND_NATIVE_REPLAY_ROCKET
         if (SpawnReplayRocket(newKeys, heldKeys))
