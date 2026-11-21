@@ -235,6 +235,30 @@ class ResourceTests(unittest.TestCase):
 
 
 class HudAllocationTests(unittest.TestCase):
+    def test_vblank_timer_budget_and_peak(self):
+        self.write("runtime-vblank.csv",
+                   "label,elapsed_ticks,peak_ticks,budget_ticks,epoch\n"
+                   "a,12,20,100,1\n"
+                   "b,10,30,100,1\n")
+        report = resources.validate(self.root, require_vblank=True)
+        self.assertEqual(report["vblank_peak_timer_ticks"], 30)
+        self.assertEqual(report["vblank_timer_remaining_ticks"], 70)
+
+    def test_vblank_timer_missing_fails_closed(self):
+        with self.assertRaises(FileNotFoundError):
+            resources.validate(self.root, require_vblank=True)
+
+    def test_vblank_timer_invalid_evidence(self):
+        for second in ("b,101,101,100,1", "b,10,19,100,1",
+                       "b,10,30,100,2", "b,10,30,99,1",
+                       "b,10,30,100,0", "c,10,30,100,1"):
+            self.write("runtime-vblank.csv",
+                       "label,elapsed_ticks,peak_ticks,budget_ticks,epoch\n"
+                       "a,12,20,100,1\n" + second + "\n")
+            with self.subTest(second=second), self.assertRaises(ValueError):
+                resources.validate(self.root, require_vblank=True)
+
+
     def test_native_window_guard(self):
         import subprocess
         source = (Path(__file__).resolve().parents[1] /
