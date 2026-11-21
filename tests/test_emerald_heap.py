@@ -125,4 +125,4 @@ class HeapInstrumentationTests(unittest.TestCase):
         self.assertIn("gPokeDnDHeapFailures++", alloc[alloc.index(guard):alloc.index("// Alignment")])
         self.assertIn("return NULL;", alloc[alloc.index(guard):alloc.index("// Alignment")])
         with self.assertRaises(RuntimeError):
-            adapter.instrument_heap(FIXTURE.replace("// Alignment\\n    if (size & 3)", "// Alignment\\n    if (size & 7)"))
+            adapter.instrument_heap(FIXTURE.replace("if (size & 3)", "if (size & 7)"))
