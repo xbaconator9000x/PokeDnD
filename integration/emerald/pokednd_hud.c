@@ -36,7 +36,9 @@ static const u8 sTxtR[]         = _("  R ");
 static const u8 sTxtSlash[]     = _("/");
 static const u8 sTxtStowed[]    = _("STOWED");
 static const u8 sTxtDeploy[]    = _("A:DEPLOY L+START:DASH B:END");
-static const u8 sTxtTrainer[]   = _("R:CMD L+START:DASH B:END");
+static const u8 sTxtTrainer[]   = _("L:ACT R:BON L+START:DASH B:END");
+static const u8 sTxtActionBudget[] = _(" A");
+static const u8 sTxtBonusBudget[]  = _(" B");
 static const u8 sTxtPokemonAct[]= _("A:BOLT R:QUICK L+START:DASH");
 static const u8 sTxtEnemyTurn[] = _("ENEMY TURN");
 static const u8 sTxtFinish[]    = _("A/B: RETURN TO FIELD");
@@ -78,6 +80,16 @@ static void AppendHp(u8 *dest, const D20Unit *unit)
     AppendNumber(dest, unit->max_hp);
 }
 
+/* The trainer owns both resources even while a commanded Pokemon is selected.
+ * Show availability from the live combat state, not the last button pressed. */
+static void AppendTrainerBudget(u8 *line, const D20Unit *human)
+{
+    StringAppend(line, sTxtActionBudget);
+    AppendNumber(line, human->action != 0);
+    StringAppend(line, sTxtBonusBudget);
+    AppendNumber(line, human->bonus != 0);
+}
+
 void PokeDnD_HudRedraw(const D20Battle *battle)
 {
     u8 line[76];
@@ -111,6 +123,8 @@ void PokeDnD_HudRedraw(const D20Battle *battle)
         StringAppend(line, sTxtMove);
         AppendNumber(line, battle->units[actor].movement);
     }
+    if (d20_current(battle) == sHumanId)
+        AppendTrainerBudget(line, human);
     PrintLine(line, 0);
 
     StringCopy(line, sTxtH);
