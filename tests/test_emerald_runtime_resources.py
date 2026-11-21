@@ -178,6 +178,21 @@ class ResourceTests(unittest.TestCase):
         self.assertEqual(report["video_checkpoints"], 2)
         self.assertEqual(report["text_bg_layouts"][0]["screen_base"], 28)
 
+    def test_bitmap_modes_without_bg_enable_fail_closed(self):
+        # Bitmap framebuffers occupy VRAM regardless of BG enable bits.
+        # Mode 1/2 affine layouts are also outside the text-BG model.
+        for mode in range(1, 6):
+            self.write("runtime-video.csv",
+                       "label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt\n"
+                       f"a,{mode | 0x1000},0,12,0,0,0,0\n"
+                       f"b,{mode | 0x1000},0,24,0,0,0,0\n")
+            self.write("runtime-oam.csv",
+                       "label,enabled_oam_entries,display_mode,obj_enabled\n"
+                       f"a,12,{mode},1\nb,40,{mode},1\n")
+            with self.subTest(mode=mode), self.assertRaisesRegex(
+                    ValueError, "unsupported GBA display mode"):
+                resources.validate(self.root, require_video=True)
+
     def test_video_shared_screen_blocks(self):
         self.write("runtime-video.csv", "label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt\na,4864,0,12,7168,7168,0,0\nb,4864,1,170,7168,7424,0,0\n")
         report = resources.validate(self.root, require_video=True)
@@ -211,7 +226,7 @@ class ResourceTests(unittest.TestCase):
             self.write("runtime-oam.csv",
                        "label,enabled_oam_entries,display_mode,obj_enabled\n"
                        f"a,12,{mode},1\nb,40,{mode},1\n")
-            with self.subTest(mode=mode), self.assertRaisesRegex(ValueError, "unsupported enabled BG"):
+            with self.subTest(mode=mode), self.assertRaisesRegex(ValueError, "unsupported GBA display mode"):
                 resources.validate(self.root, require_video=True)
 
     def test_video_missing(self):
