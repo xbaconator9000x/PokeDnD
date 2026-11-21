@@ -55,7 +55,9 @@ EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
                  * Saturate on corruption rather than wrap into a false low peak. */
                 {
                     u32 occupied = pos->size + sizeof(struct MemBlock);
-                    if (occupied < pos->size ||
+                    if (pos->magic != MALLOC_SYSTEM_ID ||
+                        !pos->allocated ||
+                        occupied < pos->size ||
                         occupied > gPokeDnDHeapCapacity ||
                         gPokeDnDHeapCurrent > gPokeDnDHeapCapacity - occupied)
                     {
