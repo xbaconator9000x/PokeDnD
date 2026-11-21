@@ -25,6 +25,7 @@
 #include "constants/event_objects.h"
 #include "constants/event_object_movement.h"
 
+#ifdef POKEDND_NATIVE_REPLAY_ROCKET
 /* Read-only stack sampling: linker symbols are emitted by instrument_stack.
  * This is the deepest SP observed at the field callback, NOT a whole-program
  * high-water mark. Never paint a live stack or claim unsampled frames. */
@@ -53,6 +54,8 @@ static void PokeDnD_SampleSystemStack(void)
         gPokeDnDStackSamplePeak = depth;
     gPokeDnDStackSampleCount++;
 }
+
+#endif /* POKEDND_NATIVE_REPLAY_ROCKET */
 
 /* These local IDs are reserved only while this debug fight is active. */
 #define D20_ROCKET_LOCAL_ID 231
@@ -821,7 +824,9 @@ static bool8 TryRocketFieldEncounter(u16 newKeys)
 bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)
 {
     int id;
+#ifdef POKEDND_NATIVE_REPLAY_ROCKET
     PokeDnD_SampleSystemStack();
+#endif
     if (!sActive) {
 #ifdef POKEDND_NATIVE_REPLAY_ROCKET
         if (SpawnReplayRocket(newKeys, heldKeys))
