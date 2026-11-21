@@ -101,20 +101,28 @@ EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
 
         // If"""),
         ("sHeapSize = heapSize;", """sHeapSize = heapSize;
-    gPokeDnDHeapCurrent = 0;
-    gPokeDnDHeapPeak = 0;
-    gPokeDnDHeapFailures = 0;
-    /* Zero capacity and wrapped epochs are invalid replay evidence.
-     * Keep the terminal sentinel across subsequent heap resets. */
-    gPokeDnDHeapCapacity = heapSize;
-    if (heapSize == 0 || gPokeDnDHeapEpoch == 0xFFFFFFFFu)
+    /* An invalid epoch or counter is terminal for this replay.  A later
+     * InitHeap must not launder an earlier allocation-accounting failure
+     * into apparently valid evidence.  Only a fresh boot clears globals. */
+    if (heapSize == 0 || gPokeDnDHeapEpoch == 0xFFFFFFFFu ||
+        gPokeDnDHeapCurrent == 0xFFFFFFFFu ||
+        gPokeDnDHeapPeak == 0xFFFFFFFFu ||
+        gPokeDnDHeapFailures == 0xFFFFFFFFu)
     {
         gPokeDnDHeapCurrent = 0xFFFFFFFFu;
         gPokeDnDHeapPeak = 0xFFFFFFFFu;
+        gPokeDnDHeapFailures = 0xFFFFFFFFu;
         gPokeDnDHeapEpoch = 0xFFFFFFFFu;
+        gPokeDnDHeapCapacity = heapSize;
     }
     else
-        gPokeDnDHeapEpoch++;"""),
+    {
+        gPokeDnDHeapCurrent = 0;
+        gPokeDnDHeapPeak = 0;
+        gPokeDnDHeapFailures = 0;
+        gPokeDnDHeapCapacity = heapSize;
+        gPokeDnDHeapEpoch++;
+    }"""),
     ]
     for old, new in edits:
         if source.count(old) != 1:
