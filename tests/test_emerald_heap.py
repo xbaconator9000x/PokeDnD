@@ -126,3 +126,18 @@ class HeapInstrumentationTests(unittest.TestCase):
         self.assertIn("return NULL;", alloc[alloc.index(guard):alloc.index("// Alignment")])
         with self.assertRaises(RuntimeError):
             adapter.instrument_heap(FIXTURE.replace("if (size & 3)", "if (size & 7)"))
+
+    def test_poisoned_peak_and_epoch_cannot_be_laundered_by_later_operations(self):
+        # A corrupted peak/epoch must remain terminal even if current is
+        # still numerically plausible. Both allocator boundaries enforce it.
+        result = adapter.instrument_heap(FIXTURE)
+        alloc = result.split("/* Account for the allocator's actual block span", 1)[1].split("return pos->data;", 1)[0]
+        free = result.split("/* Preserve the invalid sentinel across subsequent frees. */", 1)[1].split("block->allocated = FALSE;", 1)[0]
+        for boundary, update in ((alloc, "gPokeDnDHeapCurrent += occupied"),
+                                 (free, "gPokeDnDHeapCurrent -= occupied")):
+            for guard in ("gPokeDnDHeapPeak == 0xFFFFFFFFu",
+                          "gPokeDnDHeapEpoch == 0xFFFFFFFFu"):
+                self.assertIn(guard, boundary)
+                self.assertLess(boundary.index(guard), boundary.index(update))
+            self.assertIn("gPokeDnDHeapCurrent = 0xFFFFFFFFu;", boundary)
+            self.assertIn("gPokeDnDHeapPeak = 0xFFFFFFFFu;", boundary)
