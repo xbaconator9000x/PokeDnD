@@ -55,6 +55,19 @@ class HeapInstrumentationTests(unittest.TestCase):
         self.assertIn("gPokeDnDHeapCurrent == 0xFFFFFFFFu", result)
         self.assertIn("gPokeDnDHeapCurrent -= occupied", result)
 
+    def test_terminal_fault_survives_allocator_reinitialization(self):
+        # The emitted native reset branch must test old counters before
+        # zeroing them. A second InitHeap must never erase a corrupt epoch.
+        result = adapter.instrument_heap(FIXTURE)
+        reset = result.split("sHeapSize = heapSize;", 1)[1]
+        fault = reset.index("gPokeDnDHeapCurrent == 0xFFFFFFFFu")
+        clear = reset.index("gPokeDnDHeapCurrent = 0;")
+        self.assertLess(fault, clear)
+        self.assertIn("gPokeDnDHeapPeak == 0xFFFFFFFFu", reset[:clear])
+        self.assertIn("gPokeDnDHeapFailures == 0xFFFFFFFFu", reset[:clear])
+        self.assertIn("gPokeDnDHeapEpoch = 0xFFFFFFFFu;", reset[:clear])
+        self.assertIn("gPokeDnDHeapEpoch++;", reset[clear:])
+
     def test_reset_rejects_zero_capacity_and_epoch_rollover(self):
         result = adapter.instrument_heap(FIXTURE)
         self.assertIn("heapSize == 0", result)
