@@ -39,8 +39,10 @@ class StackProbeBuildIsolationTests(unittest.TestCase):
                         probe.index("gPokeDnDStackSampleCount++;"))
         self.assertIn("if (gPokeDnDStackSampleInvalid)\n        return;", probe)
         self.assertLess(probe.index("if (gPokeDnDStackSampleInvalid)"),
-                        probe.index("gPokeDnDStackSampleCount++;"))\n        self.assertLess(probe.index("sp < low"),
-                        probe.index("gPokeDnDStackSamplePeak = depth;"))\n        self.assertNotIn("memset(", probe)
+                        probe.index("gPokeDnDStackSampleCount++;"))
+        self.assertLess(probe.index("sp < low"),
+                        probe.index("gPokeDnDStackSamplePeak = depth;"))
+        self.assertNotIn("memset(", probe)
         self.assertNotIn("0xA5", probe)
 
     def test_replay_flag_and_linker_patching_are_coupled(self):
