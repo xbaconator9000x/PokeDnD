@@ -17,7 +17,7 @@ class ResourceTests(unittest.TestCase):
         self.write("runtime-oam.csv", "label,enabled_oam_entries,display_mode,obj_enabled\na,12,0,1\nb,40,0,1\n")
         self.write("runtime-stack.csv", "label,sp,bytes_above_iwram_base\na,50364412,32764\nb,50364408,32760\n")
         self.write("runtime-heap.csv", "label,current,peak,failures,capacity,epoch\na,200,300,0,1000,1\nb,100,400,0,1000,1\n")
-        self.write("runtime-stack-samples.csv", "label,low,top,peak,samples,invalid\na,50362432,50363904,256,1,0\nb,50362432,50363904,512,2,0\n")
+        self.write("runtime-stack-samples.csv", "label,low,top,peak,samples,invalid\na,50362432,50363968,256,1,0\nb,50362432,50363968,512,2,0\n")
         self.write("runtime-video.csv", "label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt\na,4352,0,12,7168,0,0,0\nb,4352,1,170,7168,0,0,0\n")
 
     def write(self, name, contents):
