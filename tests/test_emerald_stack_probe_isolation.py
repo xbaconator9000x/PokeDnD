@@ -21,12 +21,12 @@ class StackProbeBuildIsolationTests(unittest.TestCase):
         # guard. Comments between the guard and call are permitted, but
         # executable statements or a missing #endif are not.
         import re
-        calls = list(re.finditer(r"(?m)^    PokeDnD_SampleSystemStack\\(\\);$", source))
+        calls = list(re.finditer(r"(?m)^    PokeDnD_SampleSystemStack\(\);$", source))
         self.assertGreaterEqual(len(calls), 1)
         guarded = re.compile(
-            r"(?m)^#ifdef POKEDND_NATIVE_REPLAY_ROCKET\\n"
-            r"(?:[ \\t]*/\\*[^\\n]*\\*/\\n|[ \\t]*//[^\\n]*\\n|[ \\t]*\\n)*"
-            r"    PokeDnD_SampleSystemStack\\(\\);\\n#endif$"
+            r"(?m)^#ifdef POKEDND_NATIVE_REPLAY_ROCKET\n"
+            r"(?:[ \t]*/\*[^\n]*\*/\n|[ \t]*//[^\n]*\n|[ \t]*\n)*"
+            r"    PokeDnD_SampleSystemStack\(\);\n#endif$"
         )
         matches = list(guarded.finditer(source))
         self.assertEqual(len(matches), len(calls),
