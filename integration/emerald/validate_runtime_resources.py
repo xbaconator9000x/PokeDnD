@@ -296,6 +296,16 @@ def validate(directory, require_heap=False, require_stack_samples=False, require
     return report
 
 
+def reject_duplicate_json_keys(pairs):
+    """Do not let JSON parsing silently overwrite conflicting evidence claims."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate resource verdict JSON key: {key}")
+        result[key] = value
+    return result
+
+
 def verify_verdict(directory):
     """Recheck a persisted verdict against every required replay input.
 
@@ -303,7 +313,10 @@ def verify_verdict(directory):
     verify its input digests and explicit measurement limitations before use.
     """
     verdict_path = directory / "runtime-resource-verdict.json"
-    report = json.loads(verdict_path.read_text())
+    report = json.loads(verdict_path.read_text(),
+                        object_pairs_hook=reject_duplicate_json_keys)
+    if not isinstance(report, dict):
+        raise ValueError("resource verdict must be a JSON object")
     expected = {
         "runtime-probe.csv", "runtime-oam.csv", "runtime-stack.csv",
         "runtime-heap.csv", "runtime-stack-samples.csv", "runtime-video.csv"
@@ -337,7 +350,8 @@ def verify_verdict(directory):
     verified = validate(directory, require_heap=True, require_stack_samples=True,
                         require_video=True, require_vblank="runtime-vblank.csv" in expected)
     for key, value in verified.items():
-        if report.get(key) != value:
+        if json.dumps(report.get(key), sort_keys=True, allow_nan=False) != json.dumps(
+                value, sort_keys=True, allow_nan=False):
             raise ValueError(f"stale or inconsistent resource verdict: {key}")
     return report
 
