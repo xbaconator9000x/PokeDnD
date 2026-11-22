@@ -37,15 +37,15 @@ class NativeStackLinkerBoundsTests(unittest.TestCase):
 
     def test_rejects_duplicate_startup_stack_labels(self):
         with self.assertRaisesRegex(RuntimeError, "stack tops changed"):
-            instrument_stack(STARTUP + "sp_sys: .word IWRAM_END - 0x1c0\\n", LINKER)
+            instrument_stack(STARTUP + "sp_sys: .word IWRAM_END - 0x1c0\n", LINKER)
         with self.assertRaisesRegex(RuntimeError, "stack tops changed"):
-            instrument_stack(STARTUP + "sp_irq: .word IWRAM_END - 0x60\\n", LINKER)
+            instrument_stack(STARTUP + "sp_irq: .word IWRAM_END - 0x60\n", LINKER)
 
     def test_rejects_conflicting_startup_stack_definitions(self):
         with self.assertRaisesRegex(RuntimeError, "stack tops changed"):
-            instrument_stack(STARTUP + "sp_sys: .word IWRAM_END - 0x200\\n", LINKER)
+            instrument_stack(STARTUP + "sp_sys: .word IWRAM_END - 0x200\n", LINKER)
         with self.assertRaisesRegex(RuntimeError, "stack tops changed"):
-            instrument_stack(STARTUP + "sp_irq: .word IWRAM_END - 0x80\\n", LINKER)
+            instrument_stack(STARTUP + "sp_irq: .word IWRAM_END - 0x80\n", LINKER)
 
     def test_rejects_duplicate_linker_anchor(self):
         with self.assertRaisesRegex(RuntimeError, "linker anchor mismatch"):
