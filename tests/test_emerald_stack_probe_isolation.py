@@ -34,9 +34,9 @@ class StackProbeBuildIsolationTests(unittest.TestCase):
         # Mutation check: removing any replay guard must make the count fail.
         # This prevents an incorrectly escaped regex from silently passing.
         unguarded = source.replace(
-            "#ifdef POKEDND_NATIVE_REPLAY_ROCKET\\n"
-            "    /* Observe the live system SP at this combat phase; never write stack memory. */\\n",
-            "    /* Observe the live system SP at this combat phase; never write stack memory. */\\n",
+            "#ifdef POKEDND_NATIVE_REPLAY_ROCKET\n"
+            "    /* Observe the live system SP at this combat phase; never write stack memory. */\n",
+            "    /* Observe the live system SP at this combat phase; never write stack memory. */\n",
             1,
         )
         self.assertNotEqual(len(list(guarded.finditer(unguarded))), len(calls))
