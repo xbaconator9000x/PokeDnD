@@ -97,7 +97,7 @@ EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
                 gPokeDnDHeapPeak < gPokeDnDHeapCurrent ||
                 gPokeDnDHeapPeak > gPokeDnDHeapCapacity ||
                 gPokeDnDHeapEpoch == 0 ||
-                        gPokeDnDHeapEpoch == 0xFFFFFFFFu ||
+                gPokeDnDHeapEpoch == 0xFFFFFFFFu ||
                 occupied > gPokeDnDHeapCurrent)
             {
                 gPokeDnDHeapCurrent = 0xFFFFFFFFu;
