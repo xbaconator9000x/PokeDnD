@@ -23,6 +23,39 @@ class ResourceTests(unittest.TestCase):
     def write(self, name, contents):
         (self.root / name).write_text(contents)
 
+    def test_persisted_verdict_revalidation(self):
+        resources.main([str(self.root)])
+        report = resources.verify_verdict(self.root)
+        self.assertEqual(report["vblank_acceptance"], "not_measured")
+        heap = self.root / "runtime-heap.csv"
+        heap.write_text(heap.read_text().replace("b,100,400", "b,100,401"))
+        with self.assertRaisesRegex(ValueError, "stale or modified"):
+            resources.verify_verdict(self.root)
+
+    def test_verdict_rejects_missing_evidence_and_tampered_budget(self):
+        import json
+        resources.main([str(self.root)])
+        path = self.root / "runtime-resource-verdict.json"
+        report = json.loads(path.read_text())
+        report["heap_peak_bytes"] = 0
+        path.write_text(json.dumps(report))
+        with self.assertRaisesRegex(ValueError, "inconsistent resource verdict"):
+            resources.verify_verdict(self.root)
+        resources.main([str(self.root)])
+        (self.root / "runtime-stack-samples.csv").unlink()
+        with self.assertRaises(FileNotFoundError):
+            resources.verify_verdict(self.root)
+
+    def test_verdict_rejects_forged_measurement_status(self):
+        import json
+        resources.main([str(self.root)])
+        path = self.root / "runtime-resource-verdict.json"
+        report = json.loads(path.read_text())
+        report["stack_acceptance"] = "full_high_water"
+        path.write_text(json.dumps(report))
+        with self.assertRaisesRegex(ValueError, "stack measurement status"):
+            resources.verify_verdict(self.root)
+
     def test_verdict_binds_exact_replay_evidence(self):
         import hashlib
         import json
