@@ -47,7 +47,12 @@ static void PokeDnD_SampleSystemStack(void)
     if (low >= top || (low & 3u) || (top & 3u) ||
         sp < low || sp > top || (sp & 3u) ||
         gPokeDnDStackSampleCount == 0xFFFFFFFFu ||
-        gPokeDnDStackSamplePeak > top - low ||
+        /* Reserve 256 bytes for transient frames below the observed SP.
+         * A sample crossing this guard poisons the replay immediately;
+         * host-side validation must not be the first line of defence. */
+        top - low < 1024u ||
+        sp - low < 256u ||
+        gPokeDnDStackSamplePeak > top - low - 256u ||
         (gPokeDnDStackSampleCount == 0u && gPokeDnDStackSamplePeak != 0u))
     {
         gPokeDnDStackSampleInvalid = 1;
