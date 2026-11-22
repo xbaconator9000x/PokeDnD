@@ -296,6 +296,42 @@ def validate(directory, require_heap=False, require_stack_samples=False, require
     return report
 
 
+def verify_verdict(directory):
+    """Recheck a persisted verdict against every required replay input.
+
+    A JSON verdict is not a transferable acceptance certificate: callers must
+    verify its input digests and explicit measurement limitations before use.
+    """
+    verdict_path = directory / "runtime-resource-verdict.json"
+    report = json.loads(verdict_path.read_text())
+    expected = {
+        "runtime-probe.csv", "runtime-oam.csv", "runtime-stack.csv",
+        "runtime-heap.csv", "runtime-stack-samples.csv", "runtime-video.csv"
+    }
+    if report.get("vblank_acceptance") == "measured":
+        expected.add("runtime-vblank.csv")
+    elif report.get("vblank_acceptance") != "not_measured":
+        raise ValueError("unrecognized VBlank acceptance status")
+    if report.get("stack_acceptance") != "sampled_only_not_high_water" or (
+            report.get("irq_stack_acceptance") != "not_measured"):
+        raise ValueError("unrecognized stack measurement status")
+    digests = report.get("evidence_sha256")
+    if not isinstance(digests, dict) or set(digests) != expected:
+        raise ValueError("verdict evidence manifest missing or incomplete")
+    for name in sorted(expected):
+        actual = hashlib.sha256((directory / name).read_bytes()).hexdigest()
+        if not isinstance(digests[name], str) or len(digests[name]) != 64 or (
+                actual != digests[name]):
+            raise ValueError(f"stale or modified resource evidence: {name}")
+    # Hashes alone are insufficient: re-run every budget and schema check.
+    verified = validate(directory, require_heap=True, require_stack_samples=True,
+                        require_video=True, require_vblank="runtime-vblank.csv" in expected)
+    for key, value in verified.items():
+        if report.get(key) != value:
+            raise ValueError(f"stale or inconsistent resource verdict: {key}")
+    return report
+
+
 def main(argv):
     if not argv or argv[1:].count("--require-vblank") > 1 or set(argv[1:]) - {"--require-vblank"}:
         raise SystemExit("usage: validate_runtime_resources.py DIR [--require-vblank]")
