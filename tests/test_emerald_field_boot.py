@@ -61,8 +61,11 @@ class EmeraldFieldBootTests(TestCase):
     def test_stack_bounds_and_boot_order(self):
         startup = "\tbl InitializeWorkingMemory\nsp_sys: .word IWRAM_END - 0x1c0\nsp_irq: .word IWRAM_END - 0x60\n"
         patched, linker = apply.instrument_stack(startup, "    /* BEGIN ROM DATA */")
-        self.assertIn("strlo r2, [r0], #4", patched)
-        self.assertLess(patched.index("bl InitializeWorkingMemory"), patched.index("strlo"))
+        # Sampling is read-only: startup must never paint an active stack.
+        self.assertEqual(patched, startup)
+        self.assertNotIn("strlo r2, [r0], #4", patched)
+        self.assertNotIn("0xA5", patched)
+        self.assertIn("bl InitializeWorkingMemory", patched)
         self.assertIn("SIZEOF(.iwram.bss)", linker)
         self.assertIn(">= 1024", linker)
         with self.assertRaises(RuntimeError):
