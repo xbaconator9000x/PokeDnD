@@ -57,6 +57,34 @@ class VerdictIntegrityTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "unvalidated fields"):
                 MODULE.verify_verdict(self.directory)
 
+    def test_duplicate_top_level_claim_is_rejected(self):
+        self.write()
+        path = self.directory / "runtime-resource-verdict.json"
+        original = path.read_text()
+        path.write_text(original.replace('"heap_peak_bytes": 64',
+                                         '"heap_peak_bytes": 64, "heap_peak_bytes": 64'))
+        with patch.object(MODULE, "validate", return_value=self.measurements):
+            with self.assertRaisesRegex(ValueError, "duplicate resource verdict JSON key"):
+                MODULE.verify_verdict(self.directory)
+
+    def test_duplicate_nested_digest_is_rejected(self):
+        self.write()
+        path = self.directory / "runtime-resource-verdict.json"
+        original = path.read_text()
+        key = '"runtime-probe.csv":'
+        path.write_text(original.replace(key, key + ' "forged", ' + key))
+        with patch.object(MODULE, "validate", return_value=self.measurements):
+            with self.assertRaisesRegex(ValueError, "duplicate resource verdict JSON key"):
+                MODULE.verify_verdict(self.directory)
+
+    def test_boolean_cannot_impersonate_numeric_measurement(self):
+        self.measurements["heap_peak_bytes"] = 1
+        self.verdict["heap_peak_bytes"] = True
+        self.write()
+        with patch.object(MODULE, "validate", return_value=self.measurements):
+            with self.assertRaisesRegex(ValueError, "stale or inconsistent"):
+                MODULE.verify_verdict(self.directory)
+
     def test_cli_verify_rejects_modified_input(self):
         self.write()
         (self.directory / "runtime-heap.csv").write_text("tampered")
