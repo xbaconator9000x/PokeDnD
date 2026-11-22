@@ -198,6 +198,10 @@ static void TickImpact(void)
 }
 static void StartImpact(int target, D20Attack attack)
 {
+#ifdef POKEDND_NATIVE_REPLAY_ROCKET
+    /* Observe the live system SP at this combat phase; never write stack memory. */
+    PokeDnD_SampleSystemStack();
+#endif
     struct ObjectEvent *obj;
     u8 objectId;
     if (!attack.legal || !attack.hit || attack.damage <= 0)
@@ -543,6 +547,10 @@ static bool StartCombat(u8 scenario, u8 existingRocketId)
 }
 static void DisplayBattleResult(void)
 {
+#ifdef POKEDND_NATIVE_REPLAY_ROCKET
+    /* Observe the live system SP at this combat phase; never write stack memory. */
+    PokeDnD_SampleSystemStack();
+#endif
     if (sResultShown || sBattle.outcome == FIGHTING)
         return;
     sResultShown = TRUE;
@@ -682,6 +690,10 @@ static void RunEnemyPhases(void)
 }
 static void MoveSelected(u16 newKeys)
 {
+#ifdef POKEDND_NATIVE_REPLAY_ROCKET
+    /* Observe the live system SP at this combat phase; never write stack memory. */
+    PokeDnD_SampleSystemStack();
+#endif
     int id = d20_actor(&sBattle), x, y;
     D20Unit *unit;
     if (id < 0 || id == sUnits.enemy) return;
