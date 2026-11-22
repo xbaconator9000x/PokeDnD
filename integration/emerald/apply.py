@@ -64,6 +64,7 @@ EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
                         gPokeDnDHeapPeak == 0xFFFFFFFFu ||
                         gPokeDnDHeapPeak < gPokeDnDHeapCurrent ||
                         gPokeDnDHeapPeak > gPokeDnDHeapCapacity ||
+                        gPokeDnDHeapFailures == 0xFFFFFFFFu ||
                         gPokeDnDHeapEpoch == 0 ||
                         gPokeDnDHeapEpoch == 0xFFFFFFFFu ||
                         gPokeDnDHeapCurrent > gPokeDnDHeapCapacity - occupied)
@@ -96,6 +97,7 @@ EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
                 gPokeDnDHeapPeak == 0xFFFFFFFFu ||
                 gPokeDnDHeapPeak < gPokeDnDHeapCurrent ||
                 gPokeDnDHeapPeak > gPokeDnDHeapCapacity ||
+                gPokeDnDHeapFailures == 0xFFFFFFFFu ||
                 gPokeDnDHeapEpoch == 0 ||
                 gPokeDnDHeapEpoch == 0xFFFFFFFFu ||
                 occupied > gPokeDnDHeapCurrent)
@@ -120,7 +122,9 @@ EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
         gPokeDnDHeapEpoch == 0xFFFFFFFFu ||
         gPokeDnDHeapCurrent == 0xFFFFFFFFu ||
         gPokeDnDHeapPeak == 0xFFFFFFFFu ||
-        gPokeDnDHeapFailures == 0xFFFFFFFFu)
+        gPokeDnDHeapFailures == 0xFFFFFFFFu ||
+        gPokeDnDHeapPeak > gPokeDnDHeapCapacity ||
+        gPokeDnDHeapPeak < gPokeDnDHeapCurrent)
     {
         gPokeDnDHeapCurrent = 0xFFFFFFFFu;
         gPokeDnDHeapPeak = 0xFFFFFFFFu;
