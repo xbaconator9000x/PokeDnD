@@ -13,9 +13,12 @@ class ResourceTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.write("runtime-probe.csv", "label,state\na,0\nb,1\n")
+        self.write("runtime-probe.csv", "label,trigger_count,start_failure,milestones,diagnostic_state,post_cancel_moves,last_outcome,last_human_hp,last_enemy_hp,outcome_acks,impact_starts,impact_frames,dash_count,last_dash_movement,natural_encounter_count,last_natural_local_id,natural_cleanup_status,replay_fixture_status,replay_fixture_lock_count,replay_natural_lock_count,replay_fixture_attempt_count\na,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\nb,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n")
         self.write("runtime-oam.csv", "label,enabled_oam_entries,display_mode,obj_enabled\na,12,0,1\nb,40,0,1\n")
         self.write("runtime-stack.csv", "label,sp,bytes_above_iwram_base\na,50364412,32764\nb,50364408,32760\n")
+        self.write("runtime-heap.csv", "label,current,peak,failures,capacity,epoch\na,200,300,0,1000,1\nb,100,400,0,1000,1\n")
+        self.write("runtime-stack-samples.csv", "label,low,top,peak,samples,invalid\na,50362432,50363904,256,1,0\nb,50362432,50363904,512,2,0\n")
+        self.write("runtime-video.csv", "label,dispcnt,dispstat,vcount,bg0cnt,bg1cnt,bg2cnt,bg3cnt\na,4352,0,12,7168,0,0,0\nb,4352,1,170,7168,0,0,0\n")
 
     def write(self, name, contents):
         (self.root / name).write_text(contents)
@@ -28,7 +31,7 @@ class ResourceTests(unittest.TestCase):
 
     def test_baseline_trace_schema_fail_closed(self):
         original = {
-            "runtime-probe.csv": "label,state\na,0\nb,1\n",
+            "runtime-probe.csv": "label,trigger_count,start_failure,milestones,diagnostic_state,post_cancel_moves,last_outcome,last_human_hp,last_enemy_hp,outcome_acks,impact_starts,impact_frames,dash_count,last_dash_movement,natural_encounter_count,last_natural_local_id,natural_cleanup_status,replay_fixture_status,replay_fixture_lock_count,replay_natural_lock_count,replay_fixture_attempt_count\na,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\nb,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n",
             "runtime-oam.csv": "label,enabled_oam_entries,display_mode,obj_enabled\na,12,0,1\nb,40,0,1\n",
             "runtime-stack.csv": "label,sp,bytes_above_iwram_base\na,50364412,32764\nb,50364408,32760\n",
         }
