@@ -17,10 +17,20 @@ class StackProbeBuildIsolationTests(unittest.TestCase):
         self.assertIn("extern u8 __pokednd_stack_top[];", probe)
         self.assertIn('mov %0, sp', probe)
         self.assertNotIn("= 0xA5", probe)
-        call = source.index("    PokeDnD_SampleSystemStack();")
-        self.assertEqual(source[:call].splitlines()[-1],
-                         "#ifdef POKEDND_NATIVE_REPLAY_ROCKET")
-        self.assertEqual(source[call:].splitlines()[1], "#endif")
+        # Every invocation must be inside its own replay-only preprocessor
+        # guard. Comments between the guard and call are permitted, but
+        # executable statements or a missing #endif are not.
+        import re
+        calls = list(re.finditer(r"(?m)^    PokeDnD_SampleSystemStack\\(\\);$", source))
+        self.assertGreaterEqual(len(calls), 1)
+        guarded = re.compile(
+            r"(?m)^#ifdef POKEDND_NATIVE_REPLAY_ROCKET\\n"
+            r"(?:[ \\t]*/\\*[^\\n]*\\*/\\n|[ \\t]*//[^\\n]*\\n|[ \\t]*\\n)*"
+            r"    PokeDnD_SampleSystemStack\\(\\);\\n#endif$"
+        )
+        matches = list(guarded.finditer(source))
+        self.assertEqual(len(matches), len(calls),
+                         "Every native stack sample must have its own replay-only guard")
 
     def test_stack_probe_fails_closed_on_corrupt_samples(self):
         source = SOURCE.read_text(encoding="utf-8")
