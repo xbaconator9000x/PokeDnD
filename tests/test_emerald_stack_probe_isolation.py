@@ -31,6 +31,15 @@ class StackProbeBuildIsolationTests(unittest.TestCase):
         matches = list(guarded.finditer(source))
         self.assertEqual(len(matches), len(calls),
                          "Every native stack sample must have its own replay-only guard")
+        # Mutation check: removing any replay guard must make the count fail.
+        # This prevents an incorrectly escaped regex from silently passing.
+        unguarded = source.replace(
+            "#ifdef POKEDND_NATIVE_REPLAY_ROCKET\\n"
+            "    /* Observe the live system SP at this combat phase; never write stack memory. */\\n",
+            "    /* Observe the live system SP at this combat phase; never write stack memory. */\\n",
+            1,
+        )
+        self.assertNotEqual(len(list(guarded.finditer(unguarded))), len(calls))
 
     def test_stack_probe_fails_closed_on_corrupt_samples(self):
         source = SOURCE.read_text(encoding="utf-8")
