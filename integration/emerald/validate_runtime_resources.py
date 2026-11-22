@@ -306,6 +306,11 @@ def reject_duplicate_json_keys(pairs):
     return result
 
 
+def reject_nonfinite_json_constant(value):
+    """Reject Python JSON extensions (NaN/Infinity) in evidence claims."""
+    raise ValueError(f"non-finite resource verdict JSON constant: {value}")
+
+
 def verify_verdict(directory):
     """Recheck a persisted verdict against every required replay input.
 
@@ -314,7 +319,8 @@ def verify_verdict(directory):
     """
     verdict_path = directory / "runtime-resource-verdict.json"
     report = json.loads(verdict_path.read_text(),
-                        object_pairs_hook=reject_duplicate_json_keys)
+                        object_pairs_hook=reject_duplicate_json_keys,
+                        parse_constant=reject_nonfinite_json_constant)
     if not isinstance(report, dict):
         raise ValueError("resource verdict must be a JSON object")
     expected = {
