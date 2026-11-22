@@ -85,6 +85,18 @@ class VerdictIntegrityTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "stale or inconsistent"):
                 MODULE.verify_verdict(self.directory)
 
+    def test_nonfinite_numeric_claims_fail_before_measurement_validation(self):
+        self.write()
+        path = self.directory / "runtime-resource-verdict.json"
+        original = path.read_text()
+        for constant in ("NaN", "Infinity", "-Infinity"):
+            with self.subTest(constant=constant):
+                path.write_text(original.replace('"heap_peak_bytes": 64',
+                                                 '"heap_peak_bytes": ' + constant))
+                with patch.object(MODULE, "validate", return_value=self.measurements):
+                    with self.assertRaisesRegex(ValueError, "non-finite resource verdict"):
+                        MODULE.verify_verdict(self.directory)
+
     def test_cli_verify_rejects_modified_input(self):
         self.write()
         (self.directory / "runtime-heap.csv").write_text("tampered")
