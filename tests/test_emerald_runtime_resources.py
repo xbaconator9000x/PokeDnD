@@ -23,6 +23,27 @@ class ResourceTests(unittest.TestCase):
     def write(self, name, contents):
         (self.root / name).write_text(contents)
 
+    def test_verdict_binds_exact_replay_evidence(self):
+        import hashlib
+        import json
+        original = self.root / "runtime-heap.csv"
+        resources.main([str(self.root)])
+        verdict = json.loads((self.root / "runtime-resource-verdict.json").read_text())
+        expected = {
+            "runtime-probe.csv", "runtime-oam.csv", "runtime-stack.csv",
+            "runtime-heap.csv", "runtime-stack-samples.csv", "runtime-video.csv"
+        }
+        self.assertEqual(set(verdict["evidence_sha256"]), expected)
+        for name, digest in verdict["evidence_sha256"].items():
+            self.assertEqual(digest, hashlib.sha256((self.root / name).read_bytes()).hexdigest())
+        original.write_text(original.read_text().replace("b,100,400", "b,100,401"))
+        self.assertNotEqual(verdict["evidence_sha256"]["runtime-heap.csv"],
+                            hashlib.sha256(original.read_bytes()).hexdigest())
+        resources.main([str(self.root)])
+        updated = json.loads((self.root / "runtime-resource-verdict.json").read_text())
+        self.assertEqual(updated["evidence_sha256"]["runtime-heap.csv"],
+                         hashlib.sha256(original.read_bytes()).hexdigest())
+
     def test_valid(self):
         result = resources.validate(self.root)
         self.assertEqual(result["checkpoints"], 2)
