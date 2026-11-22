@@ -117,8 +117,7 @@ EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
         gPokeDnDHeapCurrent != 0 ||
         (gPokeDnDHeapEpoch == 0 &&
          (gPokeDnDHeapPeak != 0 || gPokeDnDHeapFailures != 0)) ||
-        gPokeDnDHeapEpoch == 0 ||
-                        gPokeDnDHeapEpoch == 0xFFFFFFFFu ||
+        gPokeDnDHeapEpoch == 0xFFFFFFFFu ||
         gPokeDnDHeapCurrent == 0xFFFFFFFFu ||
         gPokeDnDHeapPeak == 0xFFFFFFFFu ||
         gPokeDnDHeapFailures == 0xFFFFFFFFu)
