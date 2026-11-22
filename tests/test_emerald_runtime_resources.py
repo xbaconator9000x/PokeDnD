@@ -122,6 +122,7 @@ class ResourceTests(unittest.TestCase):
                 resources.validate(self.root, require_heap=True)
 
     def test_heap_required(self):
+        (self.root / "runtime-heap.csv").unlink()
         with self.assertRaises(FileNotFoundError):
             resources.validate(self.root, require_heap=True)
 
@@ -265,6 +266,7 @@ class ResourceTests(unittest.TestCase):
                 resources.validate(self.root, require_video=True)
 
     def test_video_missing(self):
+        (self.root / "runtime-video.csv").unlink()
         with self.assertRaises(FileNotFoundError):
             resources.validate(self.root, require_video=True)
 
