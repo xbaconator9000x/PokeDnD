@@ -265,6 +265,10 @@ static void FreezeSurroundingActors(void)
 }
 static void CleanupCombat(bool8 restorePlayer)
 {
+#ifdef POKEDND_NATIVE_REPLAY_ROCKET
+    /* Capture live SP at this nested gameplay boundary; read-only sampling. */
+    PokeDnD_SampleSystemStack();
+#endif
     EndImpact();
     /* Combat may end after a warp has reset the BG0 window heap. */
     if (sMapGroup == gSaveBlock1Ptr->location.mapGroup &&
@@ -361,6 +365,10 @@ static void MoveVisual(int id)
 }
 static bool SpawnPikachu(void)
 {
+#ifdef POKEDND_NATIVE_REPLAY_ROCKET
+    /* Capture live SP at this nested gameplay boundary; read-only sampling. */
+    PokeDnD_SampleSystemStack();
+#endif
     int id = sUnits.pokemon, wx, wy;
     u8 spriteId;
     D20Unit *human = &sBattle.units[sUnits.human];
@@ -396,6 +404,10 @@ static bool SpawnPikachu(void)
 }
 static bool StartCombat(u8 scenario, u8 existingRocketId)
 {
+#ifdef POKEDND_NATIVE_REPLAY_ROCKET
+    /* Capture live SP at this nested gameplay boundary; read-only sampling. */
+    PokeDnD_SampleSystemStack();
+#endif
     struct MapPosition player;
     int wx, wy;
     /* Avoid scripts, link rooms, active movement and accidental re-entry. */
@@ -655,6 +667,10 @@ static void EnemyPhase(void)
 }
 static void RunEnemyPhases(void)
 {
+#ifdef POKEDND_NATIVE_REPLAY_ROCKET
+    /* Capture live SP at this nested gameplay boundary; read-only sampling. */
+    PokeDnD_SampleSystemStack();
+#endif
     bool8 tookTurn = FALSE;
     for (int i = 0; i < 6 && sBattle.outcome == FIGHTING &&
                         d20_current(&sBattle) == sUnits.enemy; i++) {
