@@ -26,8 +26,10 @@ def instrument_stack(startup, linker):
     boundary = "    /* BEGIN ROM DATA */"
     if linker.count(boundary) != 1:
         raise RuntimeError("Pinned stack linker anchor mismatch")
-    if ("sp_sys: .word IWRAM_END - 0x1c0" not in startup
-            or "sp_irq: .word IWRAM_END - 0x60" not in startup):
+    if (startup.count("sp_sys: .word IWRAM_END - 0x1c0") != 1
+            or startup.count("sp_irq: .word IWRAM_END - 0x60") != 1
+            or startup.count("sp_sys:") != 1
+            or startup.count("sp_irq:") != 1):
         raise RuntimeError("Pinned system/IRQ stack tops changed")
     if "__pokednd_stack_low" in linker or "__pokednd_stack_low" in startup:
         raise RuntimeError("Stack instrumentation already installed")
