@@ -32,6 +32,30 @@ class NativeHeapEntryGuardTests(unittest.TestCase):
         self.assertLess(self.entry.index("return NULL;"),
                         self.entry.index("Reject alignment overflow"))
 
+    def test_entry_rejects_inconsistent_live_counters(self):
+        for condition in (
+            "gPokeDnDHeapCurrent > gPokeDnDHeapPeak ||",
+            "gPokeDnDHeapPeak > gPokeDnDHeapCapacity)",
+        ):
+            with self.subTest(condition=condition):
+                self.assertIn(condition, self.entry)
+        self.assertLess(self.entry.index("gPokeDnDHeapCurrent > gPokeDnDHeapPeak"),
+                        self.entry.index("return NULL;"))
+
+    def test_failure_counter_saturation_poison_is_terminal(self):
+        self.assertIn("if (gPokeDnDHeapFailures == 0xFFFFFFFEu)", self.entry)
+        saturated = self.entry.split(
+            "if (gPokeDnDHeapFailures == 0xFFFFFFFEu)", 1)[1]
+        for poison in (
+            "gPokeDnDHeapCurrent = 0xFFFFFFFFu;",
+            "gPokeDnDHeapPeak = 0xFFFFFFFFu;",
+            "gPokeDnDHeapFailures = 0xFFFFFFFFu;",
+            "gPokeDnDHeapEpoch = 0xFFFFFFFFu;",
+        ):
+            self.assertIn(poison, saturated)
+        self.assertLess(saturated.index("gPokeDnDHeapEpoch = 0xFFFFFFFFu;"),
+                        saturated.index("return NULL;"))
+
     def test_invalid_epoch_is_terminal_not_reset_by_allocation(self):
         self.assertIn("gPokeDnDHeapEpoch = 0xFFFFFFFFu;", self.entry)
         self.assertIn("gPokeDnDHeapFailures = 0xFFFFFFFFu;", self.entry)
