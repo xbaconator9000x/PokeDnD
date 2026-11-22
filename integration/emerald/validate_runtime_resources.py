@@ -1,5 +1,6 @@
 """Fail closed on missing or inconsistent live resource checkpoint traces."""
 import csv
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -310,6 +311,16 @@ def main(argv):
     report["vblank_acceptance"] = "measured" if require_vblank else "not_measured"
     report["stack_acceptance"] = "sampled_only_not_high_water"
     report["irq_stack_acceptance"] = "not_measured"
+    # Bind the verdict to the exact replay inputs; do not mistake a stale
+    # verdict for acceptance of subsequently replaced or edited CSV traces.
+    evidence_names = ("runtime-probe.csv", "runtime-oam.csv", "runtime-stack.csv",
+                      "runtime-heap.csv", "runtime-stack-samples.csv", "runtime-video.csv")
+    if require_vblank:
+        evidence_names += ("runtime-vblank.csv",)
+    report["evidence_sha256"] = {
+        name: hashlib.sha256((directory / name).read_bytes()).hexdigest()
+        for name in evidence_names
+    }
     verdict_path.write_text(
         json.dumps(report, indent=2) + "\n")
     print("PASS: resource checkpoint integrity")
