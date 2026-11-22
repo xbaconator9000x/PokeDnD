@@ -315,6 +315,16 @@ def verify_verdict(directory):
     if report.get("stack_acceptance") != "sampled_only_not_high_water" or (
             report.get("irq_stack_acceptance") != "not_measured"):
         raise ValueError("unrecognized stack measurement status")
+    # A persisted verdict must not carry unvalidated acceptance claims.
+    # Only keys produced by the current validator and its explicit status
+    # fields are admissible; unknown keys could be mistaken for approval.
+    allowed = set(validate(directory, require_heap=True,
+                           require_stack_samples=True, require_video=True,
+                           require_vblank="runtime-vblank.csv" in expected))
+    allowed.update(("vblank_acceptance", "stack_acceptance",
+                    "irq_stack_acceptance", "evidence_sha256"))
+    if set(report) != allowed:
+        raise ValueError("resource verdict contains missing or unvalidated fields")
     digests = report.get("evidence_sha256")
     if not isinstance(digests, dict) or set(digests) != expected:
         raise ValueError("verdict evidence manifest missing or incomplete")
@@ -333,8 +343,12 @@ def verify_verdict(directory):
 
 
 def main(argv):
-    if not argv or argv[1:].count("--require-vblank") > 1 or set(argv[1:]) - {"--require-vblank"}:
-        raise SystemExit("usage: validate_runtime_resources.py DIR [--require-vblank]")
+    if len(argv) == 2 and argv[1] == "--verify":
+        verify_verdict(Path(argv[0]))
+        print("PASS: resource verdict and original evidence verified")
+        return
+    if not argv or argv[1:].count("--require-vblank") > 1 or set(argv[1:]) - {"--require-vblank", "--verify"} or "--verify" in argv[1:]:
+        raise SystemExit("usage: validate_runtime_resources.py DIR [--require-vblank|--verify]")
     directory = Path(argv[0])
     require_vblank = "--require-vblank" in argv[1:]
     # Never leave a successful verdict from an earlier replay when the current
