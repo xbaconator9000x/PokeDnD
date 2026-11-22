@@ -91,7 +91,17 @@ EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
                 return pos->data;"""),
         ("if (pos->next == head)\n            return NULL;", """if (pos->next == head)
         {
-            if (gPokeDnDHeapFailures != 0xFFFFFFFFu)
+            /* Exhaustion is an allocator failure too. Never allow the
+             * failure counter to wrap or leave a terminal sentinel with
+             * an apparently healthy epoch. */
+            if (gPokeDnDHeapFailures >= 0xFFFFFFFEu)
+            {
+                gPokeDnDHeapCurrent = 0xFFFFFFFFu;
+                gPokeDnDHeapPeak = 0xFFFFFFFFu;
+                gPokeDnDHeapFailures = 0xFFFFFFFFu;
+                gPokeDnDHeapEpoch = 0xFFFFFFFFu;
+            }
+            else
                 gPokeDnDHeapFailures++;
             return NULL;
         }"""),
