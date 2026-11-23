@@ -8,6 +8,7 @@ APPLY = ROOT / "integration" / "emerald" / "apply.py"
 
 class ReplaySourceInjectionTests(unittest.TestCase):
     def test_replay_define_is_line_terminated(self):
+        source = APPLY.read_text()
         self.assertIn(r'actor.write_text("#define POKEDND_NATIVE_REPLAY_ROCKET 1\n" +', source)
         self.assertNotIn(r'actor.write_text("#define POKEDND_NATIVE_REPLAY_ROCKET 1\\n" +', source)
 
