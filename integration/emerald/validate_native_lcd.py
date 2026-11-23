@@ -19,6 +19,8 @@ def verify_png(data):
     seen_ihdr = False
     seen_idat = False
     seen_iend = False
+    seen_plte = False
+    idat_closed = False
     idat_parts = []
     depth = color = None
     while offset < len(data):
@@ -42,9 +44,19 @@ def verify_png(data):
             seen_ihdr = True
         elif kind == b"IHDR":
             raise ValueError("duplicate PNG IHDR")
+        if kind == b"PLTE":
+            if seen_plte or seen_idat or color in (0, 4) or size == 0 or size % 3 or size > 768:
+                raise ValueError("invalid PNG palette")
+            seen_plte = True
         if kind == b"IDAT":
+            if idat_closed or (color == 3 and not seen_plte):
+                raise ValueError("invalid PNG IDAT order or missing palette")
             seen_idat = True
             idat_parts.append(payload)
+        elif seen_idat:
+            idat_closed = True
+        if kind[0] & 32 == 0 and kind not in (b"IHDR", b"PLTE", b"IDAT", b"IEND"):
+            raise ValueError("unsupported critical PNG chunk")
         if kind == b"IEND":
             if size or not seen_idat or end != len(data):
                 raise ValueError("invalid PNG ending")
