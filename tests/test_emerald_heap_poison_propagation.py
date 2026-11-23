@@ -9,8 +9,8 @@ class HeapPoisonPropagationTests(unittest.TestCase):
         # These checks must precede the respective accounting updates.
         import inspect
         source = inspect.getsource(instrument_heap)
-        alloc = source.split('return pos->data;', 1)[0]
-        free = source.split('block->allocated = FALSE;', 1)[0].split('return pos->data;', 1)[-1]
+        alloc = source.split('u32 occupied = pos->size + sizeof(struct MemBlock);', 1)[1].split('return pos->data;', 1)[0]
+        free = source.split('u32 occupied = block->size + sizeof(struct MemBlock);', 1)[1].split('block->allocated = FALSE;', 1)[0]
         self.assertIn('gPokeDnDHeapFailures == 0xFFFFFFFFu', alloc)
         self.assertIn('gPokeDnDHeapFailures == 0xFFFFFFFFu', free)
         self.assertLess(alloc.index('gPokeDnDHeapFailures == 0xFFFFFFFFu'),
