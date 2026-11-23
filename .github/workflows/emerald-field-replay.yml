@@ -81,6 +81,12 @@ jobs:
             # hashes, budget checks and measurement limitations revalidate.
             python3 integration/emerald/validate_runtime_resources.py "evidence/$session" --verify
           done
+      - name: Verify persisted native LCD transition evidence
+        if: ${{ always() }}
+        run: |
+          python3 integration/emerald/validate_native_lcd.py evidence/natural standard
+          python3 integration/emerald/validate_native_lcd.py evidence/natural-victory victory
+          python3 integration/emerald/validate_native_lcd.py evidence/natural-defeat defeat
       - name: Retain emulator evidence
         if: always()
         uses: actions/upload-artifact@v4
