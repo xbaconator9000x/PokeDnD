@@ -34,6 +34,9 @@ extern u8 __pokednd_stack_top[];
 EWRAM_DATA volatile u32 gPokeDnDStackSamplePeak;
 EWRAM_DATA volatile u32 gPokeDnDStackSampleCount;
 EWRAM_DATA volatile u32 gPokeDnDStackSampleInvalid;
+/* Minimum unused stack space at sampled field callbacks. This is not an IRQ
+ * measurement or an unsampled whole-program high-water mark. */
+EWRAM_DATA volatile u32 gPokeDnDStackSampleMinFree;
 static void PokeDnD_SampleSystemStack(void)
 {
     u32 sp;
@@ -61,8 +64,17 @@ static void PokeDnD_SampleSystemStack(void)
     if (gPokeDnDStackSampleInvalid)
         return;
     depth = (u32)(top - sp);
+    if (gPokeDnDStackSampleCount == 0u ||
+        sp - low < gPokeDnDStackSampleMinFree)
+        gPokeDnDStackSampleMinFree = sp - low;
     if (depth > gPokeDnDStackSamplePeak)
         gPokeDnDStackSamplePeak = depth;
+    /* The two sampled extrema must describe the same downward-growing stack. */
+    if (gPokeDnDStackSampleMinFree != top - low - gPokeDnDStackSamplePeak)
+    {
+        gPokeDnDStackSampleInvalid = 1;
+        return;
+    }
     gPokeDnDStackSampleCount++;
 }
 
