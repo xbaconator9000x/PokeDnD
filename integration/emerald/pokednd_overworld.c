@@ -31,6 +31,36 @@
  * high-water mark. Never paint a live stack or claim unsampled frames. */
 extern u8 __pokednd_stack_low[];
 extern u8 __pokednd_stack_top[];
+/* IRQ capacity is linker-grounded, but IRQ usage remains unmeasured.
+ * Never switch CPU modes or paint a live IRQ stack from field code. */
+extern u8 __pokednd_irq_low[];
+extern u8 __pokednd_irq_top[];
+EWRAM_DATA volatile u32 gPokeDnDIrqStackCapacity;
+EWRAM_DATA volatile u32 gPokeDnDIrqStackBoundsInvalid;
+static void PokeDnD_CheckIrqStackBounds(void)
+{
+    u32 low = (u32)__pokednd_irq_low;
+    u32 top = (u32)__pokednd_irq_top;
+    /* A changed pinned layout must invalidate native resource evidence. */
+    if (low >= top || (low & 3u) || (top & 3u) ||
+        top - low != 352u || low != (u32)__pokednd_stack_top)
+    {
+        gPokeDnDIrqStackBoundsInvalid = 1u;
+        gPokeDnDIrqStackCapacity = 0u;
+        return;
+    }
+    if (gPokeDnDIrqStackBoundsInvalid)
+        return;
+    if (gPokeDnDIrqStackCapacity != 0u &&
+        gPokeDnDIrqStackCapacity != top - low)
+    {
+        gPokeDnDIrqStackBoundsInvalid = 1u;
+        gPokeDnDIrqStackCapacity = 0u;
+        return;
+    }
+    gPokeDnDIrqStackCapacity = top - low;
+}
+
 EWRAM_DATA volatile u32 gPokeDnDStackSamplePeak;
 EWRAM_DATA volatile u32 gPokeDnDStackSampleCount;
 EWRAM_DATA volatile u32 gPokeDnDStackSampleInvalid;
@@ -39,6 +69,7 @@ EWRAM_DATA volatile u32 gPokeDnDStackSampleInvalid;
 EWRAM_DATA volatile u32 gPokeDnDStackSampleMinFree;
 static void PokeDnD_SampleSystemStack(void)
 {
+    PokeDnD_CheckIrqStackBounds();
     u32 sp;
     u32 low = (u32)__pokednd_stack_low;
     u32 top = (u32)__pokednd_stack_top;
