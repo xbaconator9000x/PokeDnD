@@ -12,6 +12,22 @@ class NativeStackSamplingTests(unittest.TestCase):
                       "sp_sys: .word IWRAM_END - 0x1c0", "sp_irq: .word IWRAM_END - 0x60"):
             self.assertIn(token, PATCHER)
 
+    def test_linker_rejects_stack_without_minimum_and_guard(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("emerald_apply", ROOT / "integration/emerald/apply.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        startup = "sp_sys: .word IWRAM_END - 0x1c0\\nsp_irq: .word IWRAM_END - 0x60\\n"
+        linker = "    /* BEGIN ROM DATA */"
+        _, patched = module.instrument_stack(startup, linker)
+        self.assertIn('ASSERT(__pokednd_stack_top - __pokednd_stack_low >= 1280,', patched)
+        self.assertIn("256-byte safety reserve", patched)
+        self.assertEqual(patched.count("Insufficient system stack"), 1)
+        with self.assertRaisesRegex(RuntimeError, "already installed"):
+            module.instrument_stack(startup, patched)
+        with self.assertRaisesRegex(RuntimeError, "stack tops changed"):
+            module.instrument_stack(startup.replace("0x60", "0x64"), linker)
+
     def test_samples_actual_sp_without_writing_stack(self):
         self.assertIn('__asm__ volatile ("mov %0, sp" : "=r" (sp));', NATIVE)
         self.assertIn("sp < low || sp > top", NATIVE)
