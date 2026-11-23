@@ -2,11 +2,54 @@
 import csv
 import hashlib
 import re
+import struct
+import zlib
 import sys
 from pathlib import Path
 
 EXPECTED = ("05-authored-rocket-facing.png", "24-facing-a-natural-encounter.png")
 HEX = re.compile(r"[0-9a-f]{64}\Z")
+
+
+def verify_png(data):
+    """Require a structurally valid, complete 240x160 PNG, not arbitrary hashed bytes."""
+    if not data.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+        raise ValueError("invalid PNG signature")
+    offset = 8
+    seen_ihdr = False
+    seen_idat = False
+    seen_iend = False
+    while offset < len(data):
+        if len(data) - offset < 12:
+            raise ValueError("truncated PNG chunk")
+        size = struct.unpack_from(">I", data, offset)[0]
+        end = offset + 12 + size
+        if end > len(data):
+            raise ValueError("truncated PNG payload")
+        kind = data[offset + 4:offset + 8]
+        payload = data[offset + 8:offset + 8 + size]
+        crc = struct.unpack_from(">I", data, offset + 8 + size)[0]
+        if zlib.crc32(kind + payload) & 0xffffffff != crc:
+            raise ValueError("PNG chunk CRC mismatch")
+        if not seen_ihdr:
+            if kind != b"IHDR" or size != 13:
+                raise ValueError("missing PNG IHDR")
+            width, height, depth, color, compression, filtering, interlace = struct.unpack(">IIBBBBB", payload)
+            if (width, height) != (240, 160) or depth not in (8, 16) or color not in (0, 2, 3, 4, 6) or compression or filtering or interlace:
+                raise ValueError("invalid native LCD PNG dimensions or format")
+            seen_ihdr = True
+        elif kind == b"IHDR":
+            raise ValueError("duplicate PNG IHDR")
+        if kind == b"IDAT":
+            seen_idat = True
+        if kind == b"IEND":
+            if size or not seen_idat or end != len(data):
+                raise ValueError("invalid PNG ending")
+            seen_iend = True
+            break
+        offset = end
+    if not seen_iend:
+        raise ValueError("missing PNG IEND")
 
 
 def validate(directory, outcome):
@@ -33,7 +76,9 @@ def validate(directory, outcome):
             raise ValueError("blank or invalid LCD colour count")
         if not HEX.fullmatch(row["sha256"]):
             raise ValueError("invalid LCD digest")
-        actual = hashlib.sha256((directory / row["capture"]).read_bytes()).hexdigest()
+        data = (directory / row["capture"]).read_bytes()
+        verify_png(data)
+        actual = hashlib.sha256(data).hexdigest()
         if actual != row["sha256"]:
             raise ValueError("LCD frame digest mismatch")
         hashes.append(actual)
