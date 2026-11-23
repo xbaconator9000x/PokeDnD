@@ -34,12 +34,12 @@ class ResourceElfAuditTests(unittest.TestCase):
         self.assertTrue(result["pass"], result["violations"])
 
     def test_linked_ram_budget_exact_boundary_passes(self):
-        section = "  [ 1] .ewram NOBITS 02000000 000100 000010 00 WA 0 0 4"
+        section = "  [ 1] .ewram NOBITS 02000000 000000 000100 00 WA 0 0 4"
         result = audit_module.audit(section, symbol_table(), budgets={"EWRAM": 256})
         self.assertTrue(result["pass"], result["violations"])
 
     def test_linked_ram_budget_exceeded_fails(self):
-        section = "  [ 1] .ewram NOBITS 02000000 000100 000010 00 WA 0 0 4"
+        section = "  [ 1] .ewram NOBITS 02000000 000000 000100 00 WA 0 0 4"
         result = audit_module.audit(section, symbol_table(), budgets={"EWRAM": 255})
         self.assertFalse(result["pass"])
         self.assertIn("exceeds budget 255", " ".join(result["violations"]))
