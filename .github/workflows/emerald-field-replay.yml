@@ -70,6 +70,10 @@ jobs:
           echo "Debug=$debug_status; authored retreat=$natural_status; authored victory=$victory_status; authored defeat=$defeat_status"
           test "$debug_status" = 0 && test "$natural_status" = 0 && test "$victory_status" = 0 && test "$defeat_status" = 0
       - name: Validate live resource checkpoint evidence
+        # Run even when one emulator session fails: preserve an explicit,
+        # fail-closed diagnosis for every attempted session rather than
+        # silently skipping resource checks on the most important failures.
+        if: ${{ always() && steps.checkout.outcome != 'failure' }}
         run: |
           for session in debug natural natural-victory natural-defeat; do
             python3 integration/emerald/validate_runtime_resources.py "evidence/$session"
