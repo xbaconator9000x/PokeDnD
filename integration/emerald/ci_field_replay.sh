@@ -245,9 +245,9 @@ CHECKNATIVERESUME
     echo "FAIL: frozen LCD across native encounter transitions" >&2; exit 1;
   }
   {
-    printf 'capture,colors,sha256\\n'
+    printf 'capture,colors,sha256\n'
     for frame in "$before" "$entry" "$terminal" "$resumed"; do
-      printf '%s,%s,%s\\n' "$(basename "$frame")" "$(identify -format %k "$frame")" "$(sha256sum "$frame" | cut -d' ' -f1)"
+      printf '%s,%s,%s\n' "$(basename "$frame")" "$(identify -format %k "$frame")" "$(sha256sum "$frame" | cut -d' ' -f1)"
     done
   } > "$OUT/lcd-transition-manifest.csv"
   printf '%s\\n' "PASS: nonblank distinct native LCD entry, cleanup and movement; semantic visual review remains separate" > "$OUT/lcd-transition-verdict.txt"
