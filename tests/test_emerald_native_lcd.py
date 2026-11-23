@@ -109,19 +109,19 @@ class NativeLCDTests(unittest.TestCase):
         manifest = self.root / "lcd-transition-manifest.csv"
         lines = manifest.read_text().splitlines()
         lines[1] = f"{name},12,{hashlib.sha256(data).hexdigest()}"
-        manifest.write_text("\\n".join(lines) + "\\n")
+        manifest.write_text("\n".join(lines) + "\n")
         with self.assertRaisesRegex(ValueError, "pixel stream"):
             validate(self.root, "victory")
 
     def test_crc_valid_but_short_pixel_stream_fails(self):
         name = self.names[0]
         original = png_frame(1)
-        data = (original[:33] + png_chunk(b"IDAT", zlib.compress(b"\\x00" * 160))
+        data = (original[:33] + png_chunk(b"IDAT", zlib.compress(b"\x00" * 160))
                 + png_chunk(b"IEND", b""))
         (self.root / name).write_bytes(data)
         manifest = self.root / "lcd-transition-manifest.csv"
         lines = manifest.read_text().splitlines()
         lines[1] = f"{name},12,{hashlib.sha256(data).hexdigest()}"
-        manifest.write_text("\\n".join(lines) + "\\n")
+        manifest.write_text("\n".join(lines) + "\n")
         with self.assertRaisesRegex(ValueError, "decoded pixel length"):
             validate(self.root, "victory")
