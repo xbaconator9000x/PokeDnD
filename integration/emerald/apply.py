@@ -80,6 +80,11 @@ EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
                     {
                         gPokeDnDHeapCurrent = 0xFFFFFFFFu;
                         gPokeDnDHeapPeak = 0xFFFFFFFFu;
+                        gPokeDnDHeapFailures = 0xFFFFFFFFu;
+                        gPokeDnDHeapEpoch = 0xFFFFFFFFu;
+                        /* The upstream block is already marked allocated.
+                         * Do not hand an unaccounted pointer to gameplay. */
+                        return NULL;
                     }
                     else
                     {
