@@ -21,6 +21,17 @@ SECTION = re.compile(
     r"^\s*\[\s*\d+\]\s+(\S+)\s+\S+\s+([0-9a-fA-F]+)\s+"
     r"[0-9a-fA-F]+\s+([0-9a-fA-F]+)\s+\S+\s+(\S+)"
 )
+# Runtime allocator counters must survive linking as addressable EWRAM words.
+# Their existence does not establish that the counters were sampled in mGBA.
+REQUIRED_HEAP_COUNTERS = (
+    "gPokeDnDHeapCurrent", "gPokeDnDHeapPeak",
+    "gPokeDnDHeapFailures", "gPokeDnDHeapCapacity", "gPokeDnDHeapEpoch",
+)
+REQUIRED_STACK_COUNTERS = (
+    "gPokeDnDStackSamplePeak", "gPokeDnDStackSampleCount",
+    "gPokeDnDStackSampleInvalid", "gPokeDnDStackSampleMinFree",
+    "gPokeDnDIrqStackCapacity", "gPokeDnDIrqStackBoundsInvalid",
+)
 SYMBOL = re.compile(r"^([0-9a-fA-F]+)\s+([0-9a-fA-F]+)\s+([A-Za-z])\s+(\S+)$")
 
 
@@ -85,6 +96,15 @@ def audit(section_text, symbol_text):
         violations.append("native sBattle EWRAM symbol missing")
     if not any(s["name"] == "gPokeDnDDiagnosticState" for s in symbols):
         violations.append("native diagnostic register missing")
+    by_name = {}
+    for symbol in symbols:
+        by_name.setdefault(symbol["name"], []).append(symbol)
+    for name in REQUIRED_HEAP_COUNTERS + REQUIRED_STACK_COUNTERS:
+        matches = by_name.get(name, [])
+        if len(matches) != 1:
+            violations.append(f"required native resource counter {name}: expected one, found {len(matches)}")
+        elif matches[0]["region"] != "EWRAM" or matches[0]["bytes"] != 4:
+            violations.append(f"required native resource counter {name}: expected one 4-byte EWRAM word")
     return {"regions": regions, "pokednd_ram_symbols": symbols,
             "pokednd_ram_symbol_bytes": sum(s["bytes"] for s in symbols),
             "limitations": "Linked section allocation only; excludes runtime heap/stack peaks, sprite/OAM and VRAM use.",
