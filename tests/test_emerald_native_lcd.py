@@ -134,16 +134,16 @@ class NativeLCDTests(unittest.TestCase):
 
     def test_noncontiguous_idat_fails(self):
         data = png_frame(1)
-        mutated = (data[:33] + png_chunk(b"IDAT", zlib.compress((b"\\x00" + bytes((1, 0, 0)) * 240) * 160))
-                   + png_chunk(b"tEXt", b"k\\x00v") + png_chunk(b"IDAT", b"")
+        mutated = (data[:33] + png_chunk(b"IDAT", zlib.compress((b"\x00" + bytes((1, 0, 0)) * 240) * 160))
+                   + png_chunk(b"tEXt", b"k\x00v") + png_chunk(b"IDAT", b"")
                    + png_chunk(b"IEND", b""))
         with self.assertRaisesRegex(ValueError, "IDAT order"):
             module.verify_png(mutated)
 
     def test_indexed_png_without_palette_fails(self):
         ihdr = struct.pack(">IIBBBBB", 240, 160, 8, 3, 0, 0, 0)
-        data = (b"\\x89PNG\\r\\n\\x1a\\n" + png_chunk(b"IHDR", ihdr)
-                + png_chunk(b"IDAT", zlib.compress((b"\\x00" + b"\\x01" * 240) * 160))
+        data = (b"\x89PNG\\r\\n\x1a\\n" + png_chunk(b"IHDR", ihdr)
+                + png_chunk(b"IDAT", zlib.compress((b"\x00" + b"\x01" * 240) * 160))
                 + png_chunk(b"IEND", b""))
         with self.assertRaisesRegex(ValueError, "missing palette"):
             module.verify_png(data)
