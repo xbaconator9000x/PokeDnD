@@ -89,7 +89,7 @@ def measure_symbols(output):
     return sorted(symbols, key=lambda s: (s["region"], s["address"], s["name"]))
 
 
-def audit(section_text, symbol_text):
+def audit(section_text, symbol_text, *, require_stack=False):
     regions, violations = measure_sections(section_text)
     symbols = measure_symbols(symbol_text)
     if not any(s["name"] == "sBattle" for s in symbols):
@@ -99,7 +99,7 @@ def audit(section_text, symbol_text):
     by_name = {}
     for symbol in symbols:
         by_name.setdefault(symbol["name"], []).append(symbol)
-    for name in REQUIRED_HEAP_COUNTERS + REQUIRED_STACK_COUNTERS:
+    for name in REQUIRED_HEAP_COUNTERS + (REQUIRED_STACK_COUNTERS if require_stack else ()):
         matches = by_name.get(name, [])
         if len(matches) != 1:
             violations.append(f"required native resource counter {name}: expected one, found {len(matches)}")
@@ -115,10 +115,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("elf", type=Path)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--require-stack-counters", action="store_true",
+                        help="require replay-only stack counters in instrumented ELF")
     args = parser.parse_args()
     sections = subprocess.check_output(["arm-none-eabi-readelf", "-SW", str(args.elf)], text=True)
     symbols = subprocess.check_output(["arm-none-eabi-nm", "-S", "--defined-only", str(args.elf)], text=True)
-    report = audit(sections, symbols)
+    report = audit(sections, symbols, require_stack=args.require_stack_counters)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     for name, region in report["regions"].items():
