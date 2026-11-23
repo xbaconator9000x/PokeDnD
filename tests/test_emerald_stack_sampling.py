@@ -21,6 +21,13 @@ class NativeStackSamplingTests(unittest.TestCase):
         self.assertNotIn("memset(__pokednd_stack", NATIVE)
         self.assertNotIn("*((volatile u32 *)sp)", NATIVE)
 
+    def test_sampled_free_reserve_is_consistent_with_peak(self):
+        self.assertIn("gPokeDnDStackSampleMinFree", NATIVE)
+        self.assertIn("gPokeDnDStackSampleMinFree = sp - low;", NATIVE)
+        self.assertIn("gPokeDnDStackSampleMinFree != top - low - gPokeDnDStackSamplePeak", NATIVE)
+        self.assertIn("gPokeDnDStackSampleInvalid = 1;", NATIVE)
+        self.assertNotIn("memset(__pokednd_stack", NATIVE)
+
     def test_sampling_runs_before_field_input(self):
         hook = NATIVE.split("bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)", 1)[1]
         self.assertLess(hook.index("PokeDnD_SampleSystemStack();"), hook.index("if (!sActive)"))
