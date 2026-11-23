@@ -142,7 +142,7 @@ class NativeLCDTests(unittest.TestCase):
 
     def test_indexed_png_without_palette_fails(self):
         ihdr = struct.pack(">IIBBBBB", 240, 160, 8, 3, 0, 0, 0)
-        data = (b"\x89PNG\\r\\n\x1a\\n" + png_chunk(b"IHDR", ihdr)
+        data = (b"\x89PNG\r\n\x1a\n" + png_chunk(b"IHDR", ihdr)
                 + png_chunk(b"IDAT", zlib.compress((b"\x00" + b"\x01" * 240) * 160))
                 + png_chunk(b"IEND", b""))
         with self.assertRaisesRegex(ValueError, "missing palette"):
