@@ -18,7 +18,10 @@ SYMBOLS = """02000100 00000400 b sBattle
 02000600 00000020 b sProjection
 02000700 00000020 b sUnits
 03000100 00000004 T unrelated
-"""
+""" + "\n".join(
+    f"{0x02000800 + 8 * i:08x} 00000004 B {name}"
+    for i, name in enumerate(audit.REQUIRED_HEAP_COUNTERS)
+) + "\n"
 
 
 class GbaMemoryAuditTests(unittest.TestCase):
@@ -30,7 +33,7 @@ class GbaMemoryAuditTests(unittest.TestCase):
         self.assertTrue(result["pass"], result["violations"])
         self.assertEqual(result["regions"]["EWRAM"]["linked_bytes"], 8192)
         self.assertEqual(result["regions"]["IWRAM"]["linked_bytes"], 4096)
-        self.assertEqual(result["pokednd_ram_symbol_bytes"], 0x444)
+        self.assertEqual(result["pokednd_ram_symbol_bytes"], 0x444 + 4 * len(audit.REQUIRED_HEAP_COUNTERS))
 
     def test_overflow_fails_closed(self):
         sections = section(".ewram", 0x0203ff00, 0x200)
@@ -54,7 +57,7 @@ class GbaMemoryAuditTests(unittest.TestCase):
     def test_required_native_symbols_missing_fails_closed(self):
         result = audit.audit(section(".ewram", 0x02000000, 0x1000), "")
         self.assertFalse(result["pass"])
-        self.assertEqual(len(result["violations"]), 2)
+        self.assertEqual(len(result["violations"]), 2 + len(audit.REQUIRED_HEAP_COUNTERS))
 
     def test_section_at_end_of_region_is_not_ram(self):
         regions, errors = audit.measure_sections(section(".other", 0x02040000, 0x100))
