@@ -73,7 +73,7 @@ jobs:
         # Run even when one emulator session fails: preserve an explicit,
         # fail-closed diagnosis for every attempted session rather than
         # silently skipping resource checks on the most important failures.
-        if: ${{ always() && steps.checkout.outcome != 'failure' }}
+        if: ${{ always() }}
         run: |
           for session in debug natural natural-victory natural-defeat; do
             python3 integration/emerald/validate_runtime_resources.py "evidence/$session"
