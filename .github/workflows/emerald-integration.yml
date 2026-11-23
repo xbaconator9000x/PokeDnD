@@ -7,6 +7,7 @@ on:
       - "integration/emerald/apply.py"
       - "integration/emerald/audit_gba_memory.py"
       - "tests/test_emerald_gba_memory.py"
+      - "tests/test_emerald_resource_elf_audit.py"
       - "include/d20*"
       - "src/d20*"
       - ".github/workflows/emerald-integration.yml"
@@ -19,6 +20,7 @@ on:
       - "integration/emerald/apply.py"
       - "integration/emerald/audit_gba_memory.py"
       - "tests/test_emerald_gba_memory.py"
+      - "tests/test_emerald_resource_elf_audit.py"
       - "include/d20*"
       - "src/d20*"
       - ".github/workflows/emerald-integration.yml"
@@ -44,7 +46,9 @@ jobs:
             binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi \
             libpng-dev python3 build-essential
       - name: Regression-test GBA memory audit
-        run: python3 -m unittest discover -s tests -p "test_emerald_gba_memory.py" -v
+        run: |
+          python3 -m unittest discover -s tests -p "test_emerald_gba_memory.py" -v
+          python3 -m unittest discover -s tests -p "test_emerald_resource_elf_audit.py" -v
       - name: Fetch pinned upstream privately for build
         run: |
           git init upstream
