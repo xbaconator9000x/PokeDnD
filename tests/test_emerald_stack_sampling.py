@@ -63,6 +63,20 @@ class NativeStackSamplingTests(unittest.TestCase):
         self.assertIn("gPokeDnDStackSampleCount++", NATIVE)
         self.assertIn("gPokeDnDStackSampleCount == 0xFFFFFFFFu", NATIVE)
 
+    def test_irq_stack_bounds_are_read_only_and_fail_closed(self):
+        self.assertIn("extern u8 __pokednd_irq_low[];", NATIVE)
+        self.assertIn("extern u8 __pokednd_irq_top[];", NATIVE)
+        self.assertIn("gPokeDnDIrqStackCapacity", NATIVE)
+        self.assertIn("gPokeDnDIrqStackBoundsInvalid = 1u;", NATIVE)
+        irq = NATIVE.split("static void PokeDnD_CheckIrqStackBounds(void)", 1)[1].split(
+            "static void PokeDnD_SampleSystemStack(void)", 1)[0]
+        self.assertIn("top - low != 352u", irq)
+        self.assertIn("low != (u32)__pokednd_stack_top", irq)
+        self.assertIn("gPokeDnDIrqStackCapacity = 0u;", irq)
+        self.assertNotIn("memset(", irq)
+        self.assertNotIn("__asm__", irq)
+        self.assertIn("PokeDnD_CheckIrqStackBounds();", NATIVE)
+
     def test_does_not_claim_unsampled_stack_high_water(self):
         self.assertIn("NOT a whole-program", NATIVE)
         self.assertNotIn("gPokeDnDStackHighWater =", NATIVE)
