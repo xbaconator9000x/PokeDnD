@@ -126,8 +126,12 @@ EWRAM_DATA volatile u32 gPokeDnDHeapEpoch = 0;"""),
                 gPokeDnDHeapEpoch == 0xFFFFFFFFu ||
                 occupied > gPokeDnDHeapCurrent)
             {
+                /* A corrupted free is terminal: subsequent InitHeap and
+                 * allocation must not present a fresh valid epoch. */
                 gPokeDnDHeapCurrent = 0xFFFFFFFFu;
                 gPokeDnDHeapPeak = 0xFFFFFFFFu;
+                gPokeDnDHeapFailures = 0xFFFFFFFFu;
+                gPokeDnDHeapEpoch = 0xFFFFFFFFu;
             }
             else
                 gPokeDnDHeapCurrent -= occupied;
