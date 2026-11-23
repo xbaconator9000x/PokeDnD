@@ -22,5 +22,23 @@ class EmeraldWorkflowCoverageTests(unittest.TestCase):
         self.assertLess(upstream, replay)
 
 
+    def test_every_native_session_revalidates_persisted_resource_verdict(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        start = workflow.index("- name: Validate live resource checkpoint evidence")
+        end = workflow.index("- name: Retain emulator evidence", start)
+        step = workflow[start:end]
+        self.assertIn("for session in debug natural natural-victory natural-defeat; do", step)
+        generate = 'python3 integration/emerald/validate_runtime_resources.py "evidence/$session"'
+        verify = generate + ' --verify'
+        self.assertEqual(step.count(generate), 2)
+        self.assertEqual(step.count(verify), 1)
+        self.assertLess(step.index(generate), step.index(verify))
+        # The verification must be a hard gate, not hidden behind an
+        # unconditional success path or a best-effort shell fallback.
+        self.assertNotIn("|| true", step)
+        self.assertNotIn("continue-on-error:", step)
+        self.assertLess(start, end)
+
+
 if __name__ == "__main__":
     unittest.main()
