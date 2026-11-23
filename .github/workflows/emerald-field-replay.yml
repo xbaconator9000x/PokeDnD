@@ -73,6 +73,9 @@ jobs:
         run: |
           for session in debug natural natural-victory natural-defeat; do
             python3 integration/emerald/validate_runtime_resources.py "evidence/$session"
+            # A written verdict is not acceptance until its original inputs,
+            # hashes, budget checks and measurement limitations revalidate.
+            python3 integration/emerald/validate_runtime_resources.py "evidence/$session" --verify
           done
       - name: Retain emulator evidence
         if: always()
