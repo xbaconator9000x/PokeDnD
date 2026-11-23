@@ -39,7 +39,7 @@ def verify_png(data):
             if kind != b"IHDR" or size != 13:
                 raise ValueError("missing PNG IHDR")
             width, height, depth, color, compression, filtering, interlace = struct.unpack(">IIBBBBB", payload)
-            if (width, height) != (240, 160) or depth not in (8, 16) or color not in (0, 2, 3, 4, 6) or compression or filtering or interlace:
+            if (width, height) != (240, 160) or depth not in (8, 16) or color not in (0, 2, 3, 4, 6) or (color == 3 and depth != 8) or compression or filtering or interlace:
                 raise ValueError("invalid native LCD PNG dimensions or format")
             seen_ihdr = True
         elif kind == b"IHDR":
@@ -47,6 +47,9 @@ def verify_png(data):
         if kind == b"PLTE":
             if seen_plte or seen_idat or color in (0, 4) or size == 0 or size % 3 or size > 768:
                 raise ValueError("invalid PNG palette")
+            # Indexed images may not declare more entries than their bit depth permits.
+            if color == 3 and size // 3 > (1 << depth):
+                raise ValueError("PNG palette exceeds indexed bit depth")
             seen_plte = True
         if kind == b"IDAT":
             if idat_closed or (color == 3 and not seen_plte):
