@@ -89,9 +89,18 @@ def measure_symbols(output):
     return sorted(symbols, key=lambda s: (s["region"], s["address"], s["name"]))
 
 
-def audit(section_text, symbol_text, *, require_stack=False):
+def audit(section_text, symbol_text, *, require_stack=False, budgets=None):
     regions, violations = measure_sections(section_text)
     symbols = measure_symbols(symbol_text)
+    # Enforce explicit linked-RAM ceilings against allocated sections.
+    # Symbol sizes alone do not measure the entire linked footprint.
+    for region, ceiling in (budgets or {}).items():
+        if region not in REGIONS or type(ceiling) is not int or ceiling < 0:
+            violations.append(f"invalid resource budget {region}: {ceiling!r}")
+        elif regions[region]["linked_bytes"] > ceiling:
+            violations.append(
+                f"{region} linked allocation {regions[region]['linked_bytes']} exceeds budget {ceiling}"
+            )
     if not any(s["name"] == "sBattle" for s in symbols):
         violations.append("native sBattle EWRAM symbol missing")
     if not any(s["name"] == "gPokeDnDDiagnosticState" for s in symbols):
@@ -117,10 +126,15 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--require-stack-counters", action="store_true",
                         help="require replay-only stack counters in instrumented ELF")
+    parser.add_argument("--ewram-budget", type=int, default=None)
+    parser.add_argument("--iwram-budget", type=int, default=None)
     args = parser.parse_args()
     sections = subprocess.check_output(["arm-none-eabi-readelf", "-SW", str(args.elf)], text=True)
     symbols = subprocess.check_output(["arm-none-eabi-nm", "-S", "--defined-only", str(args.elf)], text=True)
-    report = audit(sections, symbols, require_stack=args.require_stack_counters)
+    budgets = {region: value for region, value in
+               (("EWRAM", args.ewram_budget), ("IWRAM", args.iwram_budget))
+               if value is not None}
+    report = audit(sections, symbols, require_stack=args.require_stack_counters, budgets=budgets)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     for name, region in report["regions"].items():
