@@ -13,7 +13,7 @@ class HeapFreeTerminalTests(unittest.TestCase):
     def test_corrupt_free_poison_is_terminal(self):
         # Read the actual replacement installed at the pinned allocator anchor.
         source = (ROOT / "integration/emerald/apply.py").read_text()
-        start = source.index('("block->allocated = FALSE;\\n\\n        // If"')
+        start = source.index('("block->allocated = FALSE;')
         end = source.index('("sHeapSize = heapSize;"', start)
         free_hook = source[start:end]
         terminal = free_hook.split("if (block->magic != MALLOC_SYSTEM_ID", 1)[1].split(
