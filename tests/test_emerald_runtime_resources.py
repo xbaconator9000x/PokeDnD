@@ -357,6 +357,7 @@ class ResourceTests(unittest.TestCase):
             self.assertFalse(check.call_args.kwargs["require_vblank"])
             self.assertIn('"vblank_acceptance": "not_measured"',
                           (self.root / "runtime-resource-verdict.json").read_text())
+        self.write("runtime-vblank.csv", "label,elapsed_ticks,peak_ticks,budget_ticks,epoch\\na,12,20,100,1\\nb,25,25,100,1\\n")
         with patch.object(resources, "validate", return_value={"vblank_peak_timer_ticks": 25}) as check:
             report = resources.main([str(self.root), "--require-vblank"])
             self.assertEqual(report["vblank_acceptance"], "measured")
