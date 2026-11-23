@@ -28,6 +28,19 @@ class NativeStackSamplingTests(unittest.TestCase):
         self.assertIn("gPokeDnDStackSampleInvalid = 1;", NATIVE)
         self.assertNotIn("memset(__pokednd_stack", NATIVE)
 
+    def test_corrupt_previous_extrema_fail_closed_before_mutation(self):
+        sampler = NATIVE.split("static void PokeDnD_SampleSystemStack(void)", 1)[1].split(
+            "#endif /* POKEDND_NATIVE_REPLAY_ROCKET */", 1)[0]
+        guard = sampler.split("depth = (u32)(top - sp);", 1)[0]
+        self.assertIn("gPokeDnDStackSampleMinFree != 0u", guard)
+        self.assertIn("gPokeDnDStackSampleCount != 0u", guard)
+        self.assertIn("gPokeDnDStackSampleMinFree < 256u", guard)
+        self.assertIn("gPokeDnDStackSampleMinFree > top - low", guard)
+        self.assertIn("gPokeDnDStackSampleMinFree != top - low - gPokeDnDStackSamplePeak", guard)
+        self.assertLess(guard.index("gPokeDnDStackSampleMinFree != top - low - gPokeDnDStackSamplePeak"),
+                        sampler.index("gPokeDnDStackSampleMinFree = sp - low;"))
+        self.assertIn("gPokeDnDStackSampleInvalid = 1;", guard)
+
     def test_sampling_runs_before_field_input(self):
         hook = NATIVE.split("bool8 PokeDnD_HandleOverworldInput(u16 newKeys, u16 heldKeys)", 1)[1]
         self.assertLess(hook.index("PokeDnD_SampleSystemStack();"), hook.index("if (!sActive)"))
