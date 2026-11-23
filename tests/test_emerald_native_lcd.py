@@ -81,7 +81,7 @@ class NativeLCDTests(unittest.TestCase):
         manifest = self.root / "lcd-transition-manifest.csv"
         lines = manifest.read_text().splitlines()
         lines[1] = f"{name},12,{hashlib.sha256(data).hexdigest()}"
-        manifest.write_text("\\n".join(lines) + "\\n")
+        manifest.write_text("\n".join(lines) + "\n")
         with self.assertRaisesRegex(ValueError, "PNG signature"):
             validate(self.root, "victory")
 
@@ -95,6 +95,6 @@ class NativeLCDTests(unittest.TestCase):
         manifest = self.root / "lcd-transition-manifest.csv"
         lines = manifest.read_text().splitlines()
         lines[1] = f"{name},12,{hashlib.sha256(data).hexdigest()}"
-        manifest.write_text("\\n".join(lines) + "\\n")
+        manifest.write_text("\n".join(lines) + "\n")
         with self.assertRaisesRegex(ValueError, "dimensions"):
             validate(self.root, "victory")
