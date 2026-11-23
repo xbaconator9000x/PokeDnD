@@ -40,6 +40,7 @@ def instrument_stack(startup, linker):
     __pokednd_irq_top = ORIGIN(IWRAM) + LENGTH(IWRAM) - 0x60;
     ASSERT(__pokednd_stack_low >= ORIGIN(IWRAM), "System stack begins below IWRAM")
     ASSERT(__pokednd_stack_low < __pokednd_stack_top, "System stack bounds reversed")
+    ASSERT(__pokednd_stack_top - __pokednd_stack_low >= 1024, "System stack smaller than native sampler minimum")
     ASSERT((__pokednd_stack_low & 3) == 0, "System stack low is unaligned")
     ASSERT((__pokednd_stack_top & 3) == 0, "System stack top is unaligned")
     ASSERT(__pokednd_irq_low == __pokednd_stack_top, "System/IRQ stack overlap")
