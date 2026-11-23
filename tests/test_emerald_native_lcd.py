@@ -52,6 +52,22 @@ class NativeLCDTests(unittest.TestCase):
     def test_valid_manifest(self):
         self.assertEqual(validate(self.root, "victory"), 4)
 
+    def test_indexed_png_with_16_bit_depth_fails(self):
+        name = self.names[0]
+        ihdr = struct.pack(">IIBBBBB", 240, 160, 16, 3, 0, 0, 0)
+        scanlines = (b"\x00" + b"\x00" * 480) * 160
+        data = (b"\x89PNG\r\n\x1a\n" + png_chunk(b"IHDR", ihdr)
+                + png_chunk(b"PLTE", b"\x00\x00\x00")
+                + png_chunk(b"IDAT", zlib.compress(scanlines))
+                + png_chunk(b"IEND", b""))
+        (self.root / name).write_bytes(data)
+        manifest = self.root / "lcd-transition-manifest.csv"
+        lines = manifest.read_text().splitlines()
+        lines[1] = f"{name},12,{hashlib.sha256(data).hexdigest()}"
+        manifest.write_text("\n".join(lines) + "\n")
+        with self.assertRaisesRegex(ValueError, "dimensions or format"):
+            validate(self.root, "victory")
+
     def test_tampered_lcd_fails(self):
         (self.root / self.names[1]).write_bytes(b"altered")
         with self.assertRaisesRegex(ValueError, "PNG signature"):
