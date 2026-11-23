@@ -19,6 +19,8 @@ def verify_png(data):
     seen_ihdr = False
     seen_idat = False
     seen_iend = False
+    idat_parts = []
+    depth = color = None
     while offset < len(data):
         if len(data) - offset < 12:
             raise ValueError("truncated PNG chunk")
@@ -42,6 +44,7 @@ def verify_png(data):
             raise ValueError("duplicate PNG IHDR")
         if kind == b"IDAT":
             seen_idat = True
+            idat_parts.append(payload)
         if kind == b"IEND":
             if size or not seen_idat or end != len(data):
                 raise ValueError("invalid PNG ending")
@@ -50,6 +53,24 @@ def verify_png(data):
         offset = end
     if not seen_iend:
         raise ValueError("missing PNG IEND")
+
+    # CRC-verified chunks alone do not prove a decodable screenshot.
+    # Bound inflation to the exact GBA LCD scanline footprint.
+    channels = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[color]
+    stride = (240 * channels * depth + 7) // 8
+    expected = 160 * (stride + 1)
+    inflater = zlib.decompressobj()
+    try:
+        pixels = inflater.decompress(b"".join(idat_parts), expected + 1)
+        pixels += inflater.flush(expected + 1 - len(pixels))
+    except zlib.error as exc:
+        raise ValueError("invalid PNG pixel stream") from exc
+    if (len(pixels) != expected or not inflater.eof or
+            inflater.unused_data or inflater.unconsumed_tail):
+        raise ValueError("invalid PNG decoded pixel length or trailing data")
+    if any(pixels[y * (stride + 1)] > 4 for y in range(160)):
+        raise ValueError("invalid PNG scanline filter")
+
 
 
 def validate(directory, outcome):
