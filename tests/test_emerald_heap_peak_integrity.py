@@ -21,9 +21,9 @@ class HeapPeakIntegrityTests(unittest.TestCase):
     def test_allocation_and_free_reject_corrupt_peak_before_counter_update(self):
         source = apply.instrument_heap(FIXTURE)
         self.assertEqual(source.count(
-            "gPokeDnDHeapPeak < gPokeDnDHeapCurrent"), 2)
+            "gPokeDnDHeapPeak < gPokeDnDHeapCurrent"), 3)
         self.assertEqual(source.count(
-            "gPokeDnDHeapPeak > gPokeDnDHeapCapacity"), 2)
+            "gPokeDnDHeapPeak > gPokeDnDHeapCapacity"), 3)
         alloc = source.index("u32 occupied = pos->size + sizeof(struct MemBlock);")
         alloc_end = source.index("return pos->data;", alloc)
         free = source.index("u32 occupied = block->size + sizeof(struct MemBlock);")
