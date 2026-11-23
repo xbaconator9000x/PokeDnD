@@ -23,9 +23,9 @@ def png_chunk(kind, payload):
 def png_frame(index):
     # Small valid native-size RGB image; distinct frames without proprietary assets.
     pixel = bytes((index, 0, 0))
-    scanlines = (b"\x5cx00" + pixel * 240) * 160
+    scanlines = (b"\x00" + pixel * 240) * 160
     ihdr = struct.pack(">IIBBBBB", 240, 160, 8, 2, 0, 0, 0)
-    return (b"\x5cx89PNG\x5cr\x5cn\x5cx1a\x5cn" + png_chunk(b"IHDR", ihdr)
+    return (b"\x89PNG\r\n\x1a\n" + png_chunk(b"IHDR", ihdr)
             + png_chunk(b"IDAT", zlib.compress(scanlines))
             + png_chunk(b"IEND", b""))
 
