@@ -76,7 +76,7 @@ jobs:
       - name: Audit actual native ELF GBA memory allocations
         run: |
           mkdir -p evidence
-          python3 integration/emerald/audit_gba_memory.py upstream/pokeemerald.elf --output evidence/gba-memory-budget.json
+          python3 integration/emerald/audit_gba_memory.py upstream/pokeemerald.elf --output evidence/gba-memory-budget.json --ewram-budget 262144 --iwram-budget 32768
       - name: Install native mGBA and display capture
         run: |
           sudo apt-get update -qq
