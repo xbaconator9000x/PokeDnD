@@ -13,7 +13,7 @@ HEX = re.compile(r"[0-9a-f]{64}\Z")
 
 def verify_png(data):
     """Require a structurally valid, complete 240x160 PNG, not arbitrary hashed bytes."""
-    if not data.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+    if not data.startswith(b"\x5cx89PNG\x5cr\x5cn\x5cx1a\x5cn"):
         raise ValueError("invalid PNG signature")
     offset = 8
     seen_ihdr = False
