@@ -56,6 +56,20 @@ class NativeHeapEntryGuardTests(unittest.TestCase):
         self.assertLess(saturated.index("gPokeDnDHeapEpoch = 0xFFFFFFFFu;"),
                         saturated.index("return NULL;"))
 
+    def test_corrupt_successful_allocation_never_returns_pointer(self):
+        """A poisoned accounting state must not escape as a valid allocation."""
+        allocation = self.source.split("/* Account for the allocator's actual block span", 1)[1].split("return pos->data;", 1)[0]
+        bad = allocation.split("if (pos->magic != MALLOC_SYSTEM_ID", 1)[1].split("else", 1)[0]
+        for sentinel in (
+            "gPokeDnDHeapCurrent = 0xFFFFFFFFu;",
+            "gPokeDnDHeapPeak = 0xFFFFFFFFu;",
+            "gPokeDnDHeapFailures = 0xFFFFFFFFu;",
+            "gPokeDnDHeapEpoch = 0xFFFFFFFFu;",
+        ):
+            self.assertIn(sentinel, bad)
+        self.assertIn("return NULL;", bad)
+        self.assertLess(bad.index("return NULL;"), allocation.index("else"))
+
     def test_invalid_epoch_is_terminal_not_reset_by_allocation(self):
         self.assertIn("gPokeDnDHeapEpoch = 0xFFFFFFFFu;", self.entry)
         self.assertIn("gPokeDnDHeapFailures = 0xFFFFFFFFu;", self.entry)
