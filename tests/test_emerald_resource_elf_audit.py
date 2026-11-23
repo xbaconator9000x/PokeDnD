@@ -27,7 +27,7 @@ def symbol_table(*, missing=None, wrong_region=None, wrong_size=None, duplicate=
 
 class ResourceElfAuditTests(unittest.TestCase):
     def check(self, **kwargs):
-        return audit_module.audit("", symbol_table(**kwargs))
+        return audit_module.audit("", symbol_table(**kwargs), require_stack=True)
 
     def test_all_required_native_counters_present(self):
         result = self.check()
@@ -37,6 +37,10 @@ class ResourceElfAuditTests(unittest.TestCase):
         result = self.check(missing="gPokeDnDHeapFailures")
         self.assertFalse(result["pass"])
         self.assertIn("gPokeDnDHeapFailures", " ".join(result["violations"]))
+
+    def test_non_replay_build_does_not_require_stack_counters(self):
+        result = audit_module.audit("", symbol_table(missing="gPokeDnDIrqStackCapacity"))
+        self.assertTrue(result["pass"], result["violations"])
 
     def test_missing_irq_counter_fails(self):
         self.assertFalse(self.check(missing="gPokeDnDIrqStackCapacity")["pass"])
