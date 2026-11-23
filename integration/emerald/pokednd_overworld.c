@@ -56,7 +56,15 @@ static void PokeDnD_SampleSystemStack(void)
         top - low < 1024u ||
         sp - low < 256u ||
         gPokeDnDStackSamplePeak > top - low - 256u ||
-        (gPokeDnDStackSampleCount == 0u && gPokeDnDStackSamplePeak != 0u))
+        (gPokeDnDStackSampleCount == 0u &&
+         (gPokeDnDStackSamplePeak != 0u || gPokeDnDStackSampleMinFree != 0u)) ||
+        /* Reject corrupted prior extrema BEFORE updating either value.
+         * Otherwise a later deeper sample could accidentally conceal a
+         * damaged minimum-free counter and launder invalid replay data. */
+        (gPokeDnDStackSampleCount != 0u &&
+         (gPokeDnDStackSampleMinFree < 256u ||
+          gPokeDnDStackSampleMinFree > top - low ||
+          gPokeDnDStackSampleMinFree != top - low - gPokeDnDStackSamplePeak)))
     {
         gPokeDnDStackSampleInvalid = 1;
         return;
