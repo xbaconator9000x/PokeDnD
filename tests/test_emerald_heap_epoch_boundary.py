@@ -23,7 +23,7 @@ class HeapEpochBoundaryTests(unittest.TestCase):
         source = "\n".join(anchors)
         instrumented = MODULE.instrument_heap(source)
         guard = "gPokeDnDHeapEpoch == 0 ||"
-        self.assertEqual(instrumented.count(guard), 2)
+        self.assertEqual(instrumented.count(guard), 3)  # allocation entry, success path, free
         self.assertIn("gPokeDnDHeapEpoch == 0xFFFFFFFFu ||", instrumented)
 
     def test_initial_heap_epoch_zero_remains_valid(self):
