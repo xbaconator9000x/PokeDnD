@@ -70,6 +70,14 @@ EWRAM_DATA volatile u32 gPokeDnDStackSampleMinFree;
 static void PokeDnD_SampleSystemStack(void)
 {
     PokeDnD_CheckIrqStackBounds();
+    /* IRQ linker-boundary corruption invalidates the entire stack sample.
+     * Do not continue recording apparently healthy system-stack evidence
+     * after the companion IRQ stack capacity check has failed. */
+    if (gPokeDnDIrqStackBoundsInvalid || gPokeDnDIrqStackCapacity != 352u)
+    {
+        gPokeDnDStackSampleInvalid = 1u;
+        return;
+    }
     u32 sp;
     u32 low = (u32)__pokednd_stack_low;
     u32 top = (u32)__pokednd_stack_top;
