@@ -23,7 +23,7 @@ class HeapPeakIntegrityTests(unittest.TestCase):
         self.assertEqual(source.count(
             "gPokeDnDHeapPeak < gPokeDnDHeapCurrent"), 3)
         self.assertEqual(source.count(
-            "gPokeDnDHeapPeak > gPokeDnDHeapCapacity"), 3)
+            "gPokeDnDHeapPeak > gPokeDnDHeapCapacity"), 4)
         alloc = source.index("u32 occupied = pos->size + sizeof(struct MemBlock);")
         alloc_end = source.index("return pos->data;", alloc)
         free = source.index("u32 occupied = block->size + sizeof(struct MemBlock);")
