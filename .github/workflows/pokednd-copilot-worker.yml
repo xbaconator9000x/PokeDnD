@@ -1,0 +1,152 @@
+name: PokéDND Copilot continuous coding queue
+on:
+  push:
+    branches: [development/poc-02-emerald-overworld-adapter]
+    paths:
+      - '.github/workflows/pokednd-copilot-worker.yml'
+      - '.github/pokednd-coding-state.json'
+      - 'tools/pokednd_copilot_queue.py'
+      - '.github/pokednd-coding-tasks.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: pokednd-pr2-coding-worker
+  cancel-in-progress: false
+
+jobs:
+  select:
+    if: github.repository == 'xbaconator9000x/PokeDnD' && github.ref == 'refs/heads/development/poc-02-emerald-overworld-adapter'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    outputs:
+      proceed: ${{ steps.select.outputs.proceed }}
+      stage: ${{ steps.select.outputs.stage }}
+      attempt: ${{ steps.select.outputs.attempt }}
+      total: ${{ steps.select.outputs.total }}
+      prompt: ${{ steps.select.outputs.prompt }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Preflight publishing permissions and await exact-head CI
+        id: select
+        env:
+          GH_TOKEN: ${{ secrets.POKEDND_COPILOT_DISPATCH_PAT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$GH_TOKEN"
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push --dry-run origin HEAD:refs/heads/development/poc-02-emerald-overworld-adapter
+          python3 tools/pokednd_copilot_queue.py select
+  code:
+    needs: select
+    if: needs.select.outputs.proceed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install tested coding CLI and source test dependencies
+        run: |
+          npm install -g @github/copilot@1.0.114
+          command -v gcc && command -v clang && command -v make
+      - name: Prepare pinned original engine source reference for coding agent
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init -q "$RUNNER_TEMP/rhh-checkout"
+          git -C "$RUNNER_TEMP/rhh-checkout" remote add origin https://github.com/rh-hideout/pokeemerald-expansion.git
+          git -C "$RUNNER_TEMP/rhh-checkout" fetch --quiet --no-tags --depth=1 origin 4da9230cf7c1f1d7b0d47b45783b202666fffece
+          git -C "$RUNNER_TEMP/rhh-checkout" checkout --quiet --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/rhh-checkout" rev-parse HEAD)" = 4da9230cf7c1f1d7b0d47b45783b202666fffece
+          mkdir "$RUNNER_TEMP/rhh-reference"
+          git -C "$RUNNER_TEMP/rhh-checkout" archive HEAD src include | tar -x -C "$RUNNER_TEMP/rhh-reference"
+          git -C "$RUNNER_TEMP/rhh-checkout" ls-tree -r --name-only HEAD > "$RUNNER_TEMP/rhh-reference/SOURCE_PATHS.txt"
+          chmod -R a-w "$RUNNER_TEMP/rhh-reference"
+      - name: Implement queued task and repair local test failure once
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.POKEDND_COPILOT_AGENT_PAT }}
+          COPILOT_AUTO_UPDATE: 'false'
+          TASK_B64: ${{ needs.select.outputs.prompt }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$COPILOT_GITHUB_TOKEN"
+          prompt=$(printf '%s' "$TASK_B64" | base64 -d)
+          prompt="$prompt
+
+          Pinned RHH original engine reference (read only): $RUNNER_TEMP/rhh-reference. Read the actual upstream functions and headers there; SOURCE_PATHS.txt gives original resource paths."
+          copilot --version
+          for attempt in 1 2; do
+            copilot -p "$prompt" --no-ask-user --add-dir="$RUNNER_TEMP/rhh-reference" --deny-tool="write($RUNNER_TEMP/rhh-reference)" --allow-tool='read,write,shell(git diff:*),shell(git status:*),shell(git log:*),shell(git show:*),shell(ls:*),shell(cat:*),shell(grep:*),shell(rg:*),shell(find:*)'
+            env -u COPILOT_GITHUB_TOKEN python3 tools/pokednd_copilot_queue.py validate
+            if (env -u COPILOT_GITHUB_TOKEN python3 -m compileall -q integration/emerald tools tests && env -u COPILOT_GITHUB_TOKEN python3 -m unittest discover -s tests -p 'test_emerald_*.py' -v && env -u COPILOT_GITHUB_TOKEN make clean test demo CC=gcc && env -u COPILOT_GITHUB_TOKEN make clean test demo CC=clang && bash -n integration/emerald/ci_field_replay.sh) > "$RUNNER_TEMP/queue-tests.log" 2>&1; then
+              cat "$RUNNER_TEMP/queue-tests.log"
+              exit 0
+            fi
+            cat "$RUNNER_TEMP/queue-tests.log"
+            if [ "$attempt" = 2 ]; then exit 1; fi
+            git reset --mixed HEAD
+            prompt="$prompt
+
+          Repair this local test failure without weakening assertions. Diagnostics only:
+          $(tail -c 12000 "$RUNNER_TEMP/queue-tests.log")"
+          done
+      - name: Preserve validated source patch
+        run: |
+          python3 tools/pokednd_copilot_queue.py validate
+          git diff --cached --no-ext-diff > "$RUNNER_TEMP/pokednd-validated-source.patch"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pokednd-validated-source-patch
+          path: ${{ runner.temp }}/pokednd-validated-source.patch
+          retention-days: 3
+          if-no-files-found: error
+  publish:
+    needs: [select, code]
+    if: needs.select.outputs.proceed == 'true' && needs.code.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: pokednd-validated-source-patch
+          path: ${{ runner.temp }}
+      - name: Validate clean-runner source patch and queue transition
+        env:
+          STAGE: ${{ needs.select.outputs.stage }}
+          ATTEMPT: ${{ needs.select.outputs.attempt }}
+          TOTAL: ${{ needs.select.outputs.total }}
+        run: |
+          set -euo pipefail
+          git apply --check "$RUNNER_TEMP/pokednd-validated-source.patch"
+          git apply "$RUNNER_TEMP/pokednd-validated-source.patch"
+          python3 tools/pokednd_copilot_queue.py validate
+          python3 tools/pokednd_copilot_queue.py advance "$STAGE" "$ATTEMPT" "$TOTAL"
+          git add .github/pokednd-coding-state.json
+          git diff --cached --check
+      - name: Publish candidate and trigger next exact-head gate
+        env:
+          GH_TOKEN: ${{ secrets.POKEDND_COPILOT_DISPATCH_PAT }}
+          STAGE: ${{ needs.select.outputs.stage }}
+          ATTEMPT: ${{ needs.select.outputs.attempt }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/pokednd_copilot_queue.py check-head
+          git config user.name 'PokéDND coding worker'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -c core.hooksPath=/dev/null commit -m "POKEDND queue stage $((STAGE+1)) candidate $ATTEMPT"
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push origin HEAD:refs/heads/development/poc-02-emerald-overworld-adapter
+          git rev-parse HEAD

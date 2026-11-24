@@ -15,6 +15,10 @@ on:
       - main
   pull_request:
     paths:
+      - ".github/pokednd-coding-state.json"
+      - ".github/workflows/pokednd-copilot-worker.yml"
+      - "tools/pokednd_copilot_queue.py"
+      - ".github/pokednd-coding-tasks.json"
       - "integration/emerald/pokednd_overworld.c"
       - "integration/emerald/pokednd_overworld.h"
       - "integration/emerald/apply.py"

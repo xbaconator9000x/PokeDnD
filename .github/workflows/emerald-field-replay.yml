@@ -2,6 +2,10 @@ name: POC-02 experimental Emerald field replay diagnostics
 on:
   pull_request:
     paths:
+      - ".github/pokednd-coding-state.json"
+      - ".github/workflows/pokednd-copilot-worker.yml"
+      - "tools/pokednd_copilot_queue.py"
+      - ".github/pokednd-coding-tasks.json"
       - "integration/emerald/**"
       - "tests/test_emerald_*.py"
       - "src/d20*"
