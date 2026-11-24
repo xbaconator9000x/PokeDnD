@@ -3,7 +3,20 @@ on:
   push:
     branches: [main]
   pull_request:
+    paths:
+      - ".github/pokednd-coding-state.json"
+      - ".github/workflows/pokednd-copilot-worker.yml"
+      - "tools/pokednd_copilot_queue.py"
+      - ".github/pokednd-coding-tasks.json"
+      - "gba/**"
+      - "src/**"
+      - "include/**"
+      - "Makefile"
+      - ".github/workflows/gba-demo.yml"
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
 jobs:
   build-gba:
     runs-on: ubuntu-latest
@@ -17,10 +30,16 @@ jobs:
           test -s gba/build/pokednd-poc.gba
           test "$(stat -c %s gba/build/pokednd-poc.gba)" -lt 33554432
           ls -lh gba/build/pokednd-poc.gba
+          cd gba/build
+          sha256sum pokednd-poc.gba > SHA256SUMS
+          printf "%s\n" "$GITHUB_SHA" > BUILD_COMMIT
       - uses: actions/upload-artifact@v4
         with:
           name: pokednd-poc-gba-unsigned-homebrew
-          path: gba/build/pokednd-poc.gba
+          path: |
+            gba/build/pokednd-poc.gba
+            gba/build/SHA256SUMS
+            gba/build/BUILD_COMMIT
           if-no-files-found: error
 
   emulator-boot:
@@ -32,6 +51,11 @@ jobs:
         with:
           name: pokednd-poc-gba-unsigned-homebrew
           path: rom
+      - name: Verify exact build artifact before replay
+        run: |
+          cd rom
+          sha256sum -c SHA256SUMS
+          test "$(cat BUILD_COMMIT)" = "$GITHUB_SHA"
       - name: Install native mGBA and capture utilities
         run: |
           sudo apt-get update -qq
@@ -39,23 +63,50 @@ jobs:
       - name: Boot ROM in genuine mGBA and capture LCD window
         run: |
           mkdir -p evidence
-          timeout 30s xvfb-run -a -s "-screen 0 800x600x24" bash -euo pipefail -c '
+          timeout 45s xvfb-run -a -s "-screen 0 800x600x24" bash -euo pipefail -c '
             export SDL_VIDEODRIVER=x11
             export SDL_AUDIODRIVER=dummy
             mgba rom/pokednd-poc.gba >evidence/mgba.log 2>&1 &
             EMU=$!
-            sleep 6
-            if ! kill -0 "$EMU"; then cat evidence/mgba.log; exit 1; fi
-            WINDOW=$(xdotool search --onlyvisible --name "mGBA" | head -n 1)
-            if [ -z "$WINDOW" ]; then echo "No mGBA display window"; exit 1; fi
+            trap "kill -9 $EMU 2>/dev/null || true" EXIT
+            WINDOW=""
+            # GitHub runners may take several seconds to map the SDL window.
+            # With pipefail enabled an empty xdotool search used to exit before
+            # the original if-empty guard; deliberately tolerate search retries.
+            for i in $(seq 1 15); do
+              if ! kill -0 "$EMU" 2>/dev/null; then cat evidence/mgba.log; exit 1; fi
+              WINDOW=$(xdotool search --onlyvisible --name "mGBA" 2>/dev/null | sed -n "1p" || true)
+              if [ -n "$WINDOW" ]; then break; fi
+              sleep 1
+            done
+            if [ -z "$WINDOW" ]; then echo "mGBA window never became visible"; cat evidence/mgba.log; exit 1; fi
+            sleep 2
+            echo "Capture initial LCD window $WINDOW"
             timeout 5s xwd -silent -id "$WINDOW" | convert xwd:- evidence/mgba-lcd.png
             xdotool windowfocus "$WINDOW" || true
+            echo "Injecting GBA A via mGBA SDL X key mapping"
             xdotool keydown --window "$WINDOW" x
             sleep 1
             xdotool keyup --window "$WINDOW" x
-            sleep 1
+            sleep 2
             timeout 5s xwd -silent -id "$WINDOW" | convert xwd:- evidence/mgba-after-deploy.png
-            kill -9 "$EMU" || true
+            # End deployment turn, allow Rocket AI to advance, then command
+            # Pikachu on the shared trainer initiative using Bonus Action (R).
+            xdotool keydown --window "$WINDOW" z
+            sleep 0.3
+            xdotool keyup --window "$WINDOW" z
+            sleep 2
+            xdotool keydown --window "$WINDOW" s
+            sleep 0.3
+            xdotool keyup --window "$WINDOW" s
+            sleep 2
+            timeout 5s xwd -silent -id "$WINDOW" | convert xwd:- evidence/mgba-after-bonus-command.png
+            # Pokémon uses its authorised Thunderbolt Action (A).
+            xdotool keydown --window "$WINDOW" x
+            sleep 0.3
+            xdotool keyup --window "$WINDOW" x
+            sleep 2
+            timeout 5s xwd -silent -id "$WINDOW" | convert xwd:- evidence/mgba-after-thunderbolt.png
           '
           test -s evidence/mgba-lcd.png
           COLORS=$(identify -format %k evidence/mgba-lcd.png)
@@ -66,8 +117,21 @@ jobs:
           echo "Pokémon deployment tile before: $BEFORE; after A: $AFTER"
           test "$BEFORE" != "$AFTER"
           test "$AFTER" = "srgb(255,222,16)"
+          # Default Dodge initially draws a white D at tile pixel (80,63).
+          DODGE=$(convert evidence/mgba-after-deploy.png -format "%[pixel:p{80,63}]" info:)
+          COMMANDED=$(convert evidence/mgba-after-bonus-command.png -format "%[pixel:p{80,63}]" info:)
+          echo "Pikachu Dodge marker before/after paid command: $DODGE / $COMMANDED"
+          test "$DODGE" != "$COMMANDED"
+          test "$DODGE" = "srgb(255,255,255)"
+          # Exact pixel HUD is derived from live Pokémon Action state.
+          READY=$(convert evidence/mgba-after-bonus-command.png -format "%[pixel:p{229,5}]" info:)
+          USED=$(convert evidence/mgba-after-thunderbolt.png -format "%[pixel:p{229,5}]" info:)
+          echo "Paid command / spent attack HUD: $READY / $USED"
+          test "$READY" = "srgb(57,206,49)"
+          test "$USED" = "srgb(206,49,49)"
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: pokednd-mgba-boot-evidence
           path: evidence/
-          if-no-files-found: error
+          if-no-files-found: warn

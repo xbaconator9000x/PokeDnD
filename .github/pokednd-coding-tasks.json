@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "max_attempts_per_stage": 4,
+  "max_published_candidates": 4,
+  "required_pr_workflows": [
+    "PokeDnD D20 core",
+    "PokeDnD GBA hardware demo build",
+    "POC-02 genuine Emerald overworld source integration",
+    "POC-02 experimental Emerald field replay diagnostics"
+  ],
+  "tasks": [
+    {
+      "title": "Repair and complete native Emerald vertical slice",
+      "instruction": "Fix actual exact-head failures first: three obsolete linker-bound tests require 1024 but source now correctly requires 1280 (1024 minimum plus 256 reserve), stack corruption tests must verify both zero-count extrema and invalid IRQ poisoning; normal non-replay ARM build is missing gPokeDnDHeapCurrent/Peak/Failures/Capacity/Epoch symbols required by ELF auditor. Resolve the actual intended production versus replay instrumentation contract without hiding missing symbols or relaxing safety. Inspect actual CI logs. Then get real input-driven debug and authored Oldale NPC retreat, victory and defeat replays passing with EWRAM resource evidence, actual LCD transitions, restored NPC state and post-combat field movement. Keep standalone D20 tests and original GBA demo passing. Preserve original 256KiB/32KiB memory limits and pinned upstream 4da9230cf7c1f1d7b0d47b45783b202666fffece. Do not fabricate probes or bypass input. Do not start DS or data-driven refactors before this gate."
+    }
+  ],
+  "deferred_roadmap": [
+    "Portable rules and platform isolation",
+    "2024 SRD action economy and conditions",
+    "Data-driven actor/class/encounter definitions",
+    "Pokémon-free Fighter vs Goblin native Emerald",
+    "Native GBA tactical interface",
+    "Character progression",
+    "Spellcasting and effect engine",
+    "Optional source-verified Pokémon 5e module",
+    "Mixed-party tactical encounters",
+    "Campaign compiler and persistence",
+    "GBA acceptance and DS handoff"
+  ]
+}

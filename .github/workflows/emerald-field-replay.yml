@@ -1,0 +1,101 @@
+name: POC-02 experimental Emerald field replay diagnostics
+on:
+  pull_request:
+    paths:
+      - ".github/pokednd-coding-state.json"
+      - ".github/workflows/pokednd-copilot-worker.yml"
+      - "tools/pokednd_copilot_queue.py"
+      - ".github/pokednd-coding-tasks.json"
+      - "integration/emerald/**"
+      - "tests/test_emerald_*.py"
+      - "src/d20*"
+      - "include/d20*"
+      - ".github/workflows/emerald-field-replay.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native compiler and mGBA display harness
+        run: |
+          sudo apt-get -o Acquire::Retries=5 update -qq
+          sudo apt-get -o Acquire::Retries=5 install -y --no-install-recommends \
+            binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi \
+            libpng-dev python3 build-essential mgba-sdl xvfb xdotool x11-apps imagemagick
+      - name: Replay boot and workflow source regression tests
+        run: |
+          # Run every Emerald regression, including new allocator and stack tests.
+          # A hand-maintained allowlist silently skipped new safety tests.
+          python3 -m unittest discover -s tests -p 'test_emerald_*.py' -v
+      - name: Fetch exact pinned Emerald source
+        run: |
+          git init upstream
+          git -C upstream remote add origin https://github.com/rh-hideout/pokeemerald-expansion.git
+          git -C upstream fetch --no-tags --depth=1 origin 4da9230cf7c1f1d7b0d47b45783b202666fffece
+          git -C upstream checkout --detach FETCH_HEAD
+          test "$(git -C upstream rev-parse HEAD)" = 4da9230cf7c1f1d7b0d47b45783b202666fffece
+      - name: Apply and compile exact-head native integration
+        env:
+          GAME_VERSION: EMERALD
+          COMPARE: 0
+          UNUSED_ERROR: 1
+        run: |
+          python3 integration/emerald/apply.py upstream --field-replay
+          grep -q 'SetWarpDestination(MAP_GROUP(MAP_OLDALE_TOWN)' upstream/src/new_game.c
+          make -C upstream -j4 all
+          test -s upstream/pokeemerald.elf
+          arm-none-eabi-nm upstream/pokeemerald.elf | grep ' PokeDnD_HandleOverworldInput$'
+      - name: Replay real mGBA input and capture frames
+        run: |
+          ROM=$(find upstream -maxdepth 1 -type f -name '*.gba' | head -n 1)
+          test -s "$ROM"
+          # Both sessions run even if one fails; each has its own process,
+          # GDB collector and evidence directory.
+          set +e
+          POKEDND_ELF=upstream/pokeemerald.elf timeout 245s xvfb-run -a -s "-screen 0 800x600x24" \
+            bash integration/emerald/ci_field_replay.sh "$ROM" evidence/debug
+          debug_status=$?
+          POKEDND_ELF=upstream/pokeemerald.elf timeout 150s xvfb-run -a -s "-screen 0 800x600x24" \
+            bash integration/emerald/ci_field_replay.sh "$ROM" evidence/natural natural
+          natural_status=$?
+          POKEDND_NATURAL_SCENARIO=victory POKEDND_ELF=upstream/pokeemerald.elf timeout 180s xvfb-run -a -s "-screen 0 800x600x24" \
+            bash integration/emerald/ci_field_replay.sh "$ROM" evidence/natural-victory natural
+          victory_status=$?
+          POKEDND_NATURAL_SCENARIO=defeat POKEDND_ELF=upstream/pokeemerald.elf timeout 180s xvfb-run -a -s "-screen 0 800x600x24" \
+            bash integration/emerald/ci_field_replay.sh "$ROM" evidence/natural-defeat natural
+          defeat_status=$?
+          echo "Debug=$debug_status; authored retreat=$natural_status; authored victory=$victory_status; authored defeat=$defeat_status"
+          test "$debug_status" = 0 && test "$natural_status" = 0 && test "$victory_status" = 0 && test "$defeat_status" = 0
+      - name: Validate live resource checkpoint evidence
+        # Run even when one emulator session fails: preserve an explicit,
+        # fail-closed diagnosis for every attempted session rather than
+        # silently skipping resource checks on the most important failures.
+        if: ${{ always() }}
+        run: |
+          for session in debug natural natural-victory natural-defeat; do
+            python3 integration/emerald/validate_runtime_resources.py "evidence/$session"
+            # A written verdict is not acceptance until its original inputs,
+            # hashes, budget checks and measurement limitations revalidate.
+            python3 integration/emerald/validate_runtime_resources.py "evidence/$session" --verify
+          done
+      - name: Verify persisted native LCD transition evidence
+        if: ${{ always() }}
+        run: |
+          python3 integration/emerald/validate_native_lcd.py evidence/natural standard
+          python3 integration/emerald/validate_native_lcd.py evidence/natural-victory victory
+          python3 integration/emerald/validate_native_lcd.py evidence/natural-defeat defeat
+      - name: Retain emulator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pokednd-emerald-field-replay-diagnostic
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 7
